@@ -1,0 +1,1407 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Bryan1029384756 <23323626+Bryan1029384756@users.noreply.github.com>
+Date: Sat, 17 Jun 2023 21:00:53 -0500
+Subject: [PATCH] ServerSideRecorder
+
+
+diff --git a/src/main/java/net/minecraft/serversidereplayrecorder/ClientConnectionInterface.java b/src/main/java/net/minecraft/serversidereplayrecorder/ClientConnectionInterface.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..50ac62bef8595881d826da240e34f50a578e5cb9
+--- /dev/null
++++ b/src/main/java/net/minecraft/serversidereplayrecorder/ClientConnectionInterface.java
+@@ -0,0 +1,7 @@
++package net.minecraft.serversidereplayrecorder;
++
++import java.nio.channels.Channel;
++
++public interface ClientConnectionInterface {
++    void setChannel(Channel channel);
++}
+diff --git a/src/main/java/net/minecraft/serversidereplayrecorder/EntityPlayerActionPack.java b/src/main/java/net/minecraft/serversidereplayrecorder/EntityPlayerActionPack.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..6058873794442c4cdafd37e43b5bf08fdc229e71
+--- /dev/null
++++ b/src/main/java/net/minecraft/serversidereplayrecorder/EntityPlayerActionPack.java
+@@ -0,0 +1,624 @@
++package net.minecraft.serversidereplayrecorder;
++
++import java.util.EnumMap;
++import java.util.HashMap;
++import java.util.List;
++import java.util.Map;
++import net.minecraft.commands.arguments.EntityAnchorArgument;
++import net.minecraft.core.BlockPos;
++import net.minecraft.core.Direction;
++import net.minecraft.network.protocol.game.ClientboundSetCarriedItemPacket;
++import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket;
++import net.minecraft.server.level.ServerLevel;
++import net.minecraft.server.level.ServerPlayer;
++import net.minecraft.util.Mth;
++import net.minecraft.world.InteractionHand;
++import net.minecraft.world.InteractionResult;
++import net.minecraft.world.entity.Entity;
++import net.minecraft.world.entity.animal.horse.AbstractHorse;
++import net.minecraft.world.entity.decoration.ItemFrame;
++import net.minecraft.world.entity.player.Inventory;
++import net.minecraft.world.entity.vehicle.Boat;
++import net.minecraft.world.entity.vehicle.Minecart;
++import net.minecraft.world.item.ItemStack;
++import net.minecraft.world.level.block.state.BlockState;
++import net.minecraft.world.phys.BlockHitResult;
++import net.minecraft.world.phys.EntityHitResult;
++import net.minecraft.world.phys.HitResult;
++import net.minecraft.world.phys.Vec2;
++import net.minecraft.world.phys.Vec3;
++
++public class EntityPlayerActionPack
++{
++    private final ServerPlayer player;
++
++    private final Map<ActionType, Action> actions = new EnumMap<>(ActionType.class);
++
++    private BlockPos currentBlock;
++    private int blockHitDelay;
++    private boolean isHittingBlock;
++    private float curBlockDamageMP;
++
++    private boolean sneaking;
++    private boolean sprinting;
++    private float forward;
++    private float strafing;
++
++    private int itemUseCooldown;
++
++    public EntityPlayerActionPack(ServerPlayer playerIn)
++    {
++        player = playerIn;
++        stopAll();
++    }
++    public void copyFrom(EntityPlayerActionPack other)
++    {
++        actions.putAll(other.actions);
++        currentBlock = other.currentBlock;
++        blockHitDelay = other.blockHitDelay;
++        isHittingBlock = other.isHittingBlock;
++        curBlockDamageMP = other.curBlockDamageMP;
++
++        sneaking = other.sneaking;
++        sprinting = other.sprinting;
++        forward = other.forward;
++        strafing = other.strafing;
++
++        itemUseCooldown = other.itemUseCooldown;
++    }
++
++    public EntityPlayerActionPack start(ActionType type, Action action)
++    {
++        Action previous = actions.remove(type);
++        if (previous != null) type.stop(player, previous);
++        if (action != null)
++        {
++            actions.put(type, action);
++            type.start(player, action); // noop
++        }
++        return this;
++    }
++
++    public EntityPlayerActionPack setSneaking(boolean doSneak)
++    {
++        sneaking = doSneak;
++        player.setShiftKeyDown(doSneak);
++        if (sprinting && sneaking)
++            setSprinting(false);
++        return this;
++    }
++    public EntityPlayerActionPack setSprinting(boolean doSprint)
++    {
++        sprinting = doSprint;
++        player.setSprinting(doSprint);
++        if (sneaking && sprinting)
++            setSneaking(false);
++        return this;
++    }
++
++    public EntityPlayerActionPack setForward(float value)
++    {
++        forward = value;
++        return this;
++    }
++    public EntityPlayerActionPack setStrafing(float value)
++    {
++        strafing = value;
++        return this;
++    }
++    public EntityPlayerActionPack look(Direction direction)
++    {
++        return switch (direction)
++            {
++                case NORTH -> look(180, 0);
++                case SOUTH -> look(0, 0);
++                case EAST  -> look(-90, 0);
++                case WEST  -> look(90, 0);
++                case UP    -> look(player.getYRot(), -90);
++                case DOWN  -> look(player.getYRot(), 90);
++            };
++    }
++    public EntityPlayerActionPack look(Vec2 rotation)
++    {
++        return look(rotation.x, rotation.y);
++    }
++
++    public EntityPlayerActionPack look(float yaw, float pitch)
++    {
++        player.setYRot(yaw % 360); //setYaw
++        player.setXRot(Mth.clamp(pitch, -90, 90)); // setPitch
++        // maybe player.moveTo(player.getX(), player.getY(), player.getZ(), yaw, Mth.clamp(pitch,-90.0F, 90.0F));
++        return this;
++    }
++
++    public EntityPlayerActionPack lookAt(Vec3 position)
++    {
++        player.lookAt(EntityAnchorArgument.Anchor.EYES, position);
++        return this;
++    }
++
++    public EntityPlayerActionPack turn(float yaw, float pitch)
++    {
++        return look(player.getYRot() + yaw, player.getXRot() + pitch);
++    }
++
++    public EntityPlayerActionPack turn(Vec2 rotation)
++    {
++        return turn(rotation.x, rotation.y);
++    }
++
++    public EntityPlayerActionPack stopMovement()
++    {
++        setSneaking(false);
++        setSprinting(false);
++        forward = 0.0F;
++        strafing = 0.0F;
++        return this;
++    }
++
++
++    public EntityPlayerActionPack stopAll()
++    {
++        for (ActionType type : actions.keySet()) type.stop(player, actions.get(type));
++        actions.clear();
++        return stopMovement();
++    }
++
++    public EntityPlayerActionPack mount(boolean onlyRideables)
++    {
++        //test what happens
++        List<Entity> entities;
++        if (onlyRideables)
++        {
++            entities = player.level().getEntities(player, player.getBoundingBox().inflate(3.0D, 1.0D, 3.0D),
++                e -> e instanceof Minecart || e instanceof Boat || e instanceof AbstractHorse);
++        }
++        else
++        {
++            entities = player.level().getEntities(player, player.getBoundingBox().inflate(3.0D, 1.0D, 3.0D));
++        }
++        if (entities.size()==0)
++            return this;
++        Entity closest = null;
++        double distance = Double.POSITIVE_INFINITY;
++        Entity currentVehicle = player.getVehicle();
++        for (Entity e: entities)
++        {
++            if (e == player || (currentVehicle == e))
++                continue;
++            double dd = player.distanceToSqr(e);
++            if (dd<distance)
++            {
++                distance = dd;
++                closest = e;
++            }
++        }
++        if (closest == null) return this;
++        if (closest instanceof AbstractHorse && onlyRideables)
++            ((AbstractHorse) closest).mobInteract(player, InteractionHand.MAIN_HAND);
++        else
++            player.startRiding(closest,true);
++        return this;
++    }
++    public EntityPlayerActionPack dismount()
++    {
++        player.stopRiding();
++        return this;
++    }
++
++    public void onUpdate()
++    {
++        Map<ActionType, Boolean> actionAttempts = new HashMap<>();
++        actions.values().removeIf(e -> e.done);
++        for (Map.Entry<ActionType, Action> e : actions.entrySet())
++        {
++            ActionType type = e.getKey();
++            Action action = e.getValue();
++            // skipping attack if use was successful
++            if (!(actionAttempts.getOrDefault(ActionType.USE, false) && type == ActionType.ATTACK))
++            {
++                Boolean actionStatus = action.tick(this, type);
++                if (actionStatus != null)
++                    actionAttempts.put(type, actionStatus);
++            }
++            // optionally retrying use after successful attack and unsuccessful use
++            if (type == ActionType.ATTACK
++                && actionAttempts.getOrDefault(ActionType.ATTACK, false)
++                && !actionAttempts.getOrDefault(ActionType.USE, true) )
++            {
++                // according to MinecraftClient.handleInputEvents
++                Action using = actions.get(ActionType.USE);
++                if (using != null) // this is always true - we know use worked, but just in case
++                {
++                    using.retry(this, ActionType.USE);
++                }
++            }
++        }
++        float vel = sneaking?0.3F:1.0F;
++        // The != 0.0F checks are needed given else real players can't control minecarts, however it works with fakes and else they don't stop immediately
++        if (forward != 0.0F || player instanceof EntityPlayerMPFake) {
++            player.zza = forward * vel;
++        }
++        if (strafing != 0.0F || player instanceof EntityPlayerMPFake) {
++            player.xxa = strafing * vel;
++        }
++    }
++
++    static HitResult getTarget(ServerPlayer player)
++    {
++        double reach = player.gameMode.isCreative() ? 5 : 4.5f;
++        return Tracer.rayTrace(player, 1, reach, false);
++    }
++
++    private void dropItemFromSlot(int slot, boolean dropAll)
++    {
++        Inventory inv = player.getInventory(); // getInventory;
++        if (!inv.getItem(slot).isEmpty())
++            player.drop(inv.removeItem(slot,
++                dropAll ? inv.getItem(slot).getCount() : 1
++            ), false, true); // scatter, keep owner
++    }
++
++    public void drop(int selectedSlot, boolean dropAll)
++    {
++        Inventory inv = player.getInventory(); // getInventory;
++        if (selectedSlot == -2) // all
++        {
++            for (int i = inv.getContainerSize(); i >= 0; i--)
++                dropItemFromSlot(i, dropAll);
++        }
++        else // one slot
++        {
++            if (selectedSlot == -1)
++                selectedSlot = inv.selected;
++            dropItemFromSlot(selectedSlot, dropAll);
++        }
++    }
++
++    public void setSlot(int slot)
++    {
++        player.getInventory().selected = slot-1;
++        player.connection.send(new ClientboundSetCarriedItemPacket(slot-1));
++    }
++
++    public enum ActionType
++    {
++        USE(true)
++            {
++                @Override
++                boolean execute(ServerPlayer player, Action action)
++                {
++                    EntityPlayerActionPack ap = ((ServerPlayerInterface) player).getActionPack();
++                    if (ap.itemUseCooldown > 0)
++                    {
++                        ap.itemUseCooldown--;
++                        return true;
++                    }
++                    if (player.isUsingItem())
++                    {
++                        return true;
++                    }
++                    HitResult hit = getTarget(player);
++                    for (InteractionHand hand : InteractionHand.values())
++                    {
++                        switch (hit.getType())
++                        {
++                            case BLOCK:
++                            {
++                                player.resetLastActionTime();
++                                ServerLevel world = player.serverLevel();
++                                BlockHitResult blockHit = (BlockHitResult) hit;
++                                BlockPos pos = blockHit.getBlockPos();
++                                Direction side = blockHit.getDirection();
++                                if (pos.getY() < player.level().getMaxBuildHeight() - (side == Direction.UP ? 1 : 0) && world.mayInteract(player, pos))
++                                {
++                                    InteractionResult result = player.gameMode.useItemOn(player, world, player.getItemInHand(hand), hand, blockHit);
++                                    if (result.consumesAction())
++                                    {
++                                        if (result.shouldSwing()) player.swing(hand);
++                                        ap.itemUseCooldown = 3;
++                                        return true;
++                                    }
++                                }
++                                break;
++                            }
++                            case ENTITY:
++                            {
++                                player.resetLastActionTime();
++                                EntityHitResult entityHit = (EntityHitResult) hit;
++                                Entity entity = entityHit.getEntity();
++                                boolean handWasEmpty = player.getItemInHand(hand).isEmpty();
++                                boolean itemFrameEmpty = (entity instanceof ItemFrame) && ((ItemFrame) entity).getItem().isEmpty();
++                                Vec3 relativeHitPos = entityHit.getLocation().subtract(entity.getX(), entity.getY(), entity.getZ());
++                                if (entity.interactAt(player, relativeHitPos, hand).consumesAction())
++                                {
++                                    ap.itemUseCooldown = 3;
++                                    return true;
++                                }
++                                // fix for SS itemframe always returns CONSUME even if no action is performed
++                                if (player.interactOn(entity, hand).consumesAction() && !(handWasEmpty && itemFrameEmpty))
++                                {
++                                    ap.itemUseCooldown = 3;
++                                    return true;
++                                }
++                                break;
++                            }
++                        }
++                        ItemStack handItem = player.getItemInHand(hand);
++                        if (player.gameMode.useItem(player, player.level(), handItem, hand).consumesAction())
++                        {
++                            ap.itemUseCooldown = 3;
++                            return true;
++                        }
++                    }
++                    return false;
++                }
++
++                @Override
++                void inactiveTick(ServerPlayer player, Action action)
++                {
++                    EntityPlayerActionPack ap = ((ServerPlayerInterface) player).getActionPack();
++                    ap.itemUseCooldown = 0;
++                    player.releaseUsingItem();
++                }
++            },
++        ATTACK(true) {
++            @Override
++            boolean execute(ServerPlayer player, Action action) {
++                HitResult hit = getTarget(player);
++                switch (hit.getType()) {
++                    case ENTITY: {
++                        EntityHitResult entityHit = (EntityHitResult) hit;
++                        if (!action.isContinuous)
++                        {
++                            player.attack(entityHit.getEntity());
++                            player.swing(InteractionHand.MAIN_HAND);
++                        }
++                        player.resetAttackStrengthTicker();
++                        player.resetLastActionTime();
++                        return true;
++                    }
++                    case BLOCK: {
++                        EntityPlayerActionPack ap = ((ServerPlayerInterface) player).getActionPack();
++                        if (ap.blockHitDelay > 0)
++                        {
++                            ap.blockHitDelay--;
++                            return false;
++                        }
++                        BlockHitResult blockHit = (BlockHitResult) hit;
++                        BlockPos pos = blockHit.getBlockPos();
++                        Direction side = blockHit.getDirection();
++                        if (player.blockActionRestricted(player.level(), pos, player.gameMode.getGameModeForPlayer())) return false;
++                        if (ap.currentBlock != null && player.level().getBlockState(ap.currentBlock).isAir())
++                        {
++                            ap.currentBlock = null;
++                            return false;
++                        }
++                        BlockState state = player.level().getBlockState(pos);
++                        boolean blockBroken = false;
++                        if (player.gameMode.getGameModeForPlayer().isCreative())
++                        {
++                            player.gameMode.handleBlockBreakAction(pos, ServerboundPlayerActionPacket.Action.START_DESTROY_BLOCK, side, player.level().getMaxBuildHeight(), -1);
++                            ap.blockHitDelay = 5;
++                            blockBroken = true;
++                        }
++                        else  if (ap.currentBlock == null || !ap.currentBlock.equals(pos))
++                        {
++                            if (ap.currentBlock != null)
++                            {
++                                player.gameMode.handleBlockBreakAction(ap.currentBlock, ServerboundPlayerActionPacket.Action.ABORT_DESTROY_BLOCK, side, player.level().getMaxBuildHeight(), -1);
++                            }
++                            player.gameMode.handleBlockBreakAction(pos, ServerboundPlayerActionPacket.Action.START_DESTROY_BLOCK, side, player.level().getMaxBuildHeight(), -1);
++                            boolean notAir = !state.isAir();
++                            if (notAir && ap.curBlockDamageMP == 0)
++                            {
++                                state.attack(player.level(), pos, player);
++                            }
++                            if (notAir && state.getDestroyProgress(player, player.level(), pos) >= 1)
++                            {
++                                ap.currentBlock = null;
++                                //instamine??
++                                blockBroken = true;
++                            }
++                            else
++                            {
++                                ap.currentBlock = pos;
++                                ap.curBlockDamageMP = 0;
++                            }
++                        }
++                        else
++                        {
++                            ap.curBlockDamageMP += state.getDestroyProgress(player, player.level(), pos);
++                            if (ap.curBlockDamageMP >= 1)
++                            {
++                                player.gameMode.handleBlockBreakAction(pos, ServerboundPlayerActionPacket.Action.STOP_DESTROY_BLOCK, side, player.level().getMaxBuildHeight(), -1);
++                                ap.currentBlock = null;
++                                ap.blockHitDelay = 5;
++                                blockBroken = true;
++                            }
++                            player.level().destroyBlockProgress(-1, pos, (int) (ap.curBlockDamageMP * 10));
++
++                        }
++                        player.resetLastActionTime();
++                        player.swing(InteractionHand.MAIN_HAND);
++                        return blockBroken;
++                    }
++                }
++                return false;
++            }
++
++            @Override
++            void inactiveTick(ServerPlayer player, Action action)
++            {
++                EntityPlayerActionPack ap = ((ServerPlayerInterface) player).getActionPack();
++                if (ap.currentBlock == null) return;
++                player.level().destroyBlockProgress(-1, ap.currentBlock, -1);
++                player.gameMode.handleBlockBreakAction(ap.currentBlock, ServerboundPlayerActionPacket.Action.ABORT_DESTROY_BLOCK, Direction.DOWN, player.level().getMaxBuildHeight(), -1);
++                ap.currentBlock = null;
++            }
++        },
++        JUMP(true)
++            {
++                @Override
++                boolean execute(ServerPlayer player, Action action)
++                {
++                    if (action.limit == 1)
++                    {
++                        if (player.onGround()) player.jumpFromGround(); // onGround
++                    }
++                    else
++                    {
++                        player.setJumping(true);
++                    }
++                    return false;
++                }
++
++                @Override
++                void inactiveTick(ServerPlayer player, Action action)
++                {
++                    player.setJumping(false);
++                }
++            },
++        DROP_ITEM(true)
++            {
++                @Override
++                boolean execute(ServerPlayer player, Action action)
++                {
++                    player.resetLastActionTime();
++                    player.drop(false); // dropSelectedItem
++                    return false;
++                }
++            },
++        DROP_STACK(true)
++            {
++                @Override
++                boolean execute(ServerPlayer player, Action action)
++                {
++                    player.resetLastActionTime();
++                    player.drop(true); // dropSelectedItem
++                    return false;
++                }
++            },
++        SWAP_HANDS(true)
++            {
++                @Override
++                boolean execute(ServerPlayer player, Action action)
++                {
++                    player.resetLastActionTime();
++                    ItemStack itemStack_1 = player.getItemInHand(InteractionHand.OFF_HAND);
++                    player.setItemInHand(InteractionHand.OFF_HAND, player.getItemInHand(InteractionHand.MAIN_HAND));
++                    player.setItemInHand(InteractionHand.MAIN_HAND, itemStack_1);
++                    return false;
++                }
++            };
++
++        public final boolean preventSpectator;
++
++        ActionType(boolean preventSpectator)
++        {
++            this.preventSpectator = preventSpectator;
++        }
++
++        void start(ServerPlayer player, Action action) {}
++        abstract boolean execute(ServerPlayer player, Action action);
++        void inactiveTick(ServerPlayer player, Action action) {}
++        void stop(ServerPlayer player, Action action)
++        {
++            inactiveTick(player, action);
++        }
++    }
++
++    public static class Action
++    {
++        public boolean done = false;
++        public final int limit;
++        public final int interval;
++        public final int offset;
++        private int count;
++        private int next;
++        private final boolean isContinuous;
++
++        private Action(int limit, int interval, int offset, boolean continuous)
++        {
++            this.limit = limit;
++            this.interval = interval;
++            this.offset = offset;
++            next = interval + offset;
++            isContinuous = continuous;
++        }
++
++        public static Action once()
++        {
++            return new Action(1, 1, 0, false);
++        }
++
++        public static Action continuous()
++        {
++            return new Action(-1, 1, 0, true);
++        }
++
++        public static Action interval(int interval)
++        {
++            return new Action(-1, interval, 0, false);
++        }
++
++        public static Action interval(int interval, int offset)
++        {
++            return new Action(-1, interval, offset, false);
++        }
++
++        Boolean tick(EntityPlayerActionPack actionPack, ActionType type)
++        {
++            next--;
++            Boolean cancel = null;
++            if (next <= 0)
++            {
++                if (interval == 1 && !isContinuous)
++                {
++                    // need to allow entity to tick, otherwise won't have effect (bow)
++                    // actions are 20 tps, so need to clear status mid tick, allowing entities process it till next time
++                    if (!type.preventSpectator || !actionPack.player.isSpectator())
++                    {
++                        type.inactiveTick(actionPack.player, this);
++                    }
++                }
++
++                if (!type.preventSpectator || !actionPack.player.isSpectator())
++                {
++                    cancel = type.execute(actionPack.player, this);
++                }
++                count++;
++                if (count == limit)
++                {
++                    type.stop(actionPack.player, null);
++                    done = true;
++                    return cancel;
++                }
++                next = interval;
++            }
++            else
++            {
++                if (!type.preventSpectator || !actionPack.player.isSpectator())
++                {
++                    type.inactiveTick(actionPack.player, this);
++                }
++            }
++            return cancel;
++        }
++
++        void retry(EntityPlayerActionPack actionPack, ActionType type)
++        {
++            //assuming action run but was unsuccesful that tick, but opportunity emerged to retry it, lets retry it.
++            if (!type.preventSpectator || !actionPack.player.isSpectator())
++            {
++                type.execute(actionPack.player, this);
++            }
++            count++;
++            if (count == limit)
++            {
++                type.stop(actionPack.player, null);
++                done = true;
++            }
++        }
++    }
++}
+diff --git a/src/main/java/net/minecraft/serversidereplayrecorder/EntityPlayerMPFake.java b/src/main/java/net/minecraft/serversidereplayrecorder/EntityPlayerMPFake.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..9cb83da225fab61d68e615c6ef5fc18c1758665d
+--- /dev/null
++++ b/src/main/java/net/minecraft/serversidereplayrecorder/EntityPlayerMPFake.java
+@@ -0,0 +1,206 @@
++package net.minecraft.serversidereplayrecorder;
++
++import com.mojang.authlib.GameProfile;
++import net.minecraft.core.BlockPos;
++import net.minecraft.core.UUIDUtil;
++import net.minecraft.network.chat.Component;
++import net.minecraft.network.chat.contents.TranslatableContents;
++import net.minecraft.network.protocol.PacketFlow;
++import net.minecraft.network.protocol.game.ClientboundPlayerInfoUpdatePacket;
++import net.minecraft.network.protocol.game.ClientboundRotateHeadPacket;
++import net.minecraft.network.protocol.game.ClientboundTeleportEntityPacket;
++import net.minecraft.network.protocol.game.ServerboundClientCommandPacket;
++import net.minecraft.resources.ResourceKey;
++import net.minecraft.server.MinecraftServer;
++import net.minecraft.server.TickTask;
++import net.minecraft.server.level.ServerLevel;
++import net.minecraft.server.level.ServerPlayer;
++import net.minecraft.server.players.GameProfileCache;
++import net.minecraft.world.damagesource.DamageSource;
++import net.minecraft.world.entity.Entity;
++import net.minecraft.world.entity.EquipmentSlot;
++import net.minecraft.world.entity.player.Player;
++import net.minecraft.world.food.FoodData;
++import net.minecraft.world.item.ItemStack;
++import net.minecraft.world.level.GameType;
++import net.minecraft.world.level.Level;
++import net.minecraft.world.level.block.entity.SkullBlockEntity;
++import net.minecraft.world.level.block.state.BlockState;
++import net.minecraft.world.phys.Vec3;
++
++import java.util.concurrent.atomic.AtomicReference;
++
++@SuppressWarnings("EntityConstructor")
++public class EntityPlayerMPFake extends ServerPlayer
++{
++    public Runnable fixStartingPosition = () -> {};
++    public boolean isAShadow;
++
++    public static EntityPlayerMPFake createFake(String username, MinecraftServer server, Vec3 pos, double yaw, double pitch, ResourceKey<Level> dimensionId, GameType gamemode, boolean flying)
++    {
++        //prolly half of that crap is not necessary, but it works
++        ServerLevel worldIn = server.getLevel(dimensionId);
++        GameProfileCache.setUsesAuthentication(false);
++        GameProfile gameprofile;
++        try {
++            gameprofile = server.getProfileCache().get(username).orElse(null); //findByName  .orElse(null)
++        }
++        finally {
++            GameProfileCache.setUsesAuthentication(server.isDedicatedServer() && server.usesAuthentication());
++        }
++        if (gameprofile == null)
++        {
++                gameprofile = new GameProfile(UUIDUtil.createOfflinePlayerUUID(username), username);
++        }
++        if (gameprofile.getProperties().containsKey("textures"))
++        {
++            AtomicReference<GameProfile> result = new AtomicReference<>();
++            SkullBlockEntity.updateGameprofile(gameprofile, result::set);
++            gameprofile = result.get();
++        }
++        EntityPlayerMPFake instance = new EntityPlayerMPFake(server, worldIn, gameprofile, false);
++        instance.fixStartingPosition = () -> instance.moveTo(pos.x, pos.y, pos.z, (float) yaw, (float) pitch);
++        server.getPlayerList().placeNewPlayer(new FakeClientConnection(PacketFlow.SERVERBOUND), instance);
++        instance.teleportTo(worldIn, pos.x, pos.y, pos.z, (float) yaw, (float) pitch);
++        instance.setHealth(20.0F);
++        instance.unsetRemoved();
++        instance.setMaxUpStep(0.6F);
++        instance.gameMode.changeGameModeForPlayer(gamemode);
++        server.getPlayerList().broadcastAll(new ClientboundRotateHeadPacket(instance, (byte) (instance.yHeadRot * 256 / 360)), dimensionId);//instance.dimension);
++        server.getPlayerList().broadcastAll(new ClientboundTeleportEntityPacket(instance), dimensionId);//instance.dimension);
++        //instance.world.getChunkManager(). updatePosition(instance);
++        instance.entityData.set(DATA_PLAYER_MODE_CUSTOMISATION, (byte) 0x7f); // show all model layers (incl. capes)
++        instance.getAbilities().flying = flying;
++        return instance;
++    }
++
++    public static EntityPlayerMPFake createShadow(MinecraftServer server, ServerPlayer player)
++    {
++        player.getServer().getPlayerList().remove(player);
++        player.connection.disconnect(Component.translatable("multiplayer.disconnect.duplicate_login"));
++        ServerLevel worldIn = player.serverLevel();//.getWorld(player.dimension);
++        GameProfile gameprofile = player.getGameProfile();
++        EntityPlayerMPFake playerShadow = new EntityPlayerMPFake(server, worldIn, gameprofile, true);
++        playerShadow.setChatSession(player.getChatSession());
++        server.getPlayerList().placeNewPlayer(new FakeClientConnection(PacketFlow.SERVERBOUND), playerShadow);
++
++        playerShadow.setHealth(player.getHealth());
++        playerShadow.connection.teleport(player.getX(), player.getY(), player.getZ(), player.getYRot(), player.getXRot());
++        playerShadow.gameMode.changeGameModeForPlayer(player.gameMode.getGameModeForPlayer());
++        ((ServerPlayerInterface) playerShadow).getActionPack().copyFrom(((ServerPlayerInterface) player).getActionPack());
++        playerShadow.setMaxUpStep(0.6F);
++        playerShadow.entityData.set(DATA_PLAYER_MODE_CUSTOMISATION, player.getEntityData().get(DATA_PLAYER_MODE_CUSTOMISATION));
++
++
++        server.getPlayerList().broadcastAll(new ClientboundRotateHeadPacket(playerShadow, (byte) (player.yHeadRot * 256 / 360)), playerShadow.level().dimension());
++        server.getPlayerList().broadcastAll(new ClientboundPlayerInfoUpdatePacket(ClientboundPlayerInfoUpdatePacket.Action.ADD_PLAYER, playerShadow));
++        //player.world.getChunkManager().updatePosition(playerShadow);
++        playerShadow.getAbilities().flying = player.getAbilities().flying;
++        return playerShadow;
++    }
++
++    public static EntityPlayerMPFake respawnFake(MinecraftServer server, ServerLevel level, GameProfile profile)
++    {
++        return new EntityPlayerMPFake(server, level, profile, false);
++    }
++
++    private EntityPlayerMPFake(MinecraftServer server, ServerLevel worldIn, GameProfile profile, boolean shadow)
++    {
++        super(server, worldIn, profile);
++        isAShadow = shadow;
++    }
++
++    @Override
++    public void onEquipItem(final EquipmentSlot slot, final ItemStack previous, final ItemStack stack)
++    {
++        if (!isUsingItem()) super.onEquipItem(slot, previous, stack);
++    }
++
++    @Override
++    public void kill()
++    {
++        kill(Messenger.s("Killed"));
++    }
++
++    public void kill(Component reason)
++    {
++        shakeOff();
++
++        if (reason.getContents() instanceof TranslatableContents text && text.getKey().equals("multiplayer.disconnect.duplicate_login")) {
++            this.connection.onDisconnect(reason);
++        } else {
++            this.server.tell(new TickTask(this.server.getTickCount(), () -> {
++                this.connection.onDisconnect(reason);
++            }));
++        }
++    }
++
++    @Override
++    public void tick()
++    {
++        if (this.getServer().getTickCount() % 10 == 0)
++        {
++            this.connection.resetPosition();
++            this.serverLevel().getChunkSource().move(this);
++        }
++        try
++        {
++            super.tick();
++            this.doTick();
++        }
++        catch (NullPointerException ignored)
++        {
++            // happens with that paper port thingy - not sure what that would fix, but hey
++            // the game not gonna crash violently.
++        }
++
++
++    }
++
++    private void shakeOff()
++    {
++        if (getVehicle() instanceof Player) stopRiding();
++        for (Entity passenger : getIndirectPassengers())
++        {
++            if (passenger instanceof Player) passenger.stopRiding();
++        }
++    }
++
++    @Override
++    public void die(DamageSource cause)
++    {
++        shakeOff();
++        super.die(cause);
++        setHealth(20);
++        this.foodData = new FoodData();
++        kill(this.getCombatTracker().getDeathMessage());
++    }
++
++    @Override
++    public String getIpAddress()
++    {
++        return "127.0.0.1";
++    }
++
++    @Override
++    protected void checkFallDamage(double y, boolean onGround, BlockState state, BlockPos pos) {
++        doCheckFallDamage(0.0, y, 0.0, onGround);
++    }
++
++    @Override
++    public Entity changeDimension(ServerLevel serverLevel)
++    {
++        super.changeDimension(serverLevel);
++        if (wonGame) {
++            ServerboundClientCommandPacket p = new ServerboundClientCommandPacket(ServerboundClientCommandPacket.Action.PERFORM_RESPAWN);
++            connection.handleClientCommand(p);
++        }
++
++        // If above branch was taken, *this* has been removed and replaced, the new instance has been set
++        // on 'our' connection (which is now theirs, but we still have a ref).
++        if (connection.player.isChangingDimension()) {
++            connection.player.hasChangedDimension();
++        }
++        return connection.player;
++    }
++}
+diff --git a/src/main/java/net/minecraft/serversidereplayrecorder/FakeClientConnection.java b/src/main/java/net/minecraft/serversidereplayrecorder/FakeClientConnection.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..8ef8f0be62f90ff8956a396dad2b17625a8c6131
+--- /dev/null
++++ b/src/main/java/net/minecraft/serversidereplayrecorder/FakeClientConnection.java
+@@ -0,0 +1,28 @@
++package net.minecraft.serversidereplayrecorder;
++
++import io.netty.channel.embedded.EmbeddedChannel;
++import net.minecraft.network.Connection;
++import net.minecraft.network.protocol.PacketFlow;
++
++import java.nio.channels.Channel;
++
++public class FakeClientConnection extends Connection
++{
++    public FakeClientConnection(PacketFlow p)
++    {
++        super(p);
++        // compat with adventure-platform-fabric. This does NOT trigger other vanilla handlers for establishing a channel
++        // also makes #isOpen return true, allowing enderpearls to teleport fake players
++        ((ClientConnectionInterface)this).setChannel((Channel) new EmbeddedChannel());
++    }
++
++    @Override
++    public void setReadOnly()
++    {
++    }
++
++    @Override
++    public void handleDisconnection()
++    {
++    }
++}
+diff --git a/src/main/java/net/minecraft/serversidereplayrecorder/Messenger.java b/src/main/java/net/minecraft/serversidereplayrecorder/Messenger.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..29a553e514127ca631a336dc0244b60f3e7bd7bb
+--- /dev/null
++++ b/src/main/java/net/minecraft/serversidereplayrecorder/Messenger.java
+@@ -0,0 +1,311 @@
++package net.minecraft.serversidereplayrecorder;
++
++import net.minecraft.ChatFormatting;
++import net.minecraft.commands.CommandSourceStack;
++import net.minecraft.core.BlockPos;
++import net.minecraft.network.chat.Component;
++import net.minecraft.network.chat.MutableComponent;
++import net.minecraft.network.chat.ClickEvent;
++import net.minecraft.network.chat.HoverEvent;
++import net.minecraft.network.chat.Style;
++import net.minecraft.network.chat.TextColor;
++import net.minecraft.server.MinecraftServer;
++import net.minecraft.world.entity.MobCategory;
++import net.minecraft.world.entity.player.Player;
++import net.minecraft.world.phys.Vec3;
++import org.slf4j.Logger;
++import org.slf4j.LoggerFactory;
++
++import java.util.ArrayList;
++import java.util.Collection;
++import java.util.List;
++import java.util.function.BiFunction;
++import java.util.function.Function;
++import java.util.regex.Matcher;
++import java.util.regex.Pattern;
++
++public class Messenger
++{
++    public static final Logger LOG = LoggerFactory.getLogger("Messaging System");
++
++    private static final Pattern colorExtract = Pattern.compile("#([0-9a-fA-F]{6})");
++    public enum CarpetFormatting
++    {
++        ITALIC      ('i', (s, f) -> s.withItalic(true)),
++        STRIKE      ('s', (s, f) -> s.applyFormat(ChatFormatting.STRIKETHROUGH)),
++        UNDERLINE   ('u', (s, f) -> s.applyFormat(ChatFormatting.UNDERLINE)),
++        BOLD        ('b', (s, f) -> s.withBold(true)),
++        OBFUSCATE   ('o', (s, f) -> s.applyFormat(ChatFormatting.OBFUSCATED)),
++
++        WHITE       ('w', (s, f) -> s.withColor(ChatFormatting.WHITE)),
++        YELLOW      ('y', (s, f) -> s.withColor(ChatFormatting.YELLOW)),
++        LIGHT_PURPLE('m', (s, f) -> s.withColor(ChatFormatting.LIGHT_PURPLE)), // magenta
++        RED         ('r', (s, f) -> s.withColor(ChatFormatting.RED)),
++        AQUA        ('c', (s, f) -> s.withColor(ChatFormatting.AQUA)), // cyan
++        GREEN       ('l', (s, f) -> s.withColor(ChatFormatting.GREEN)), // lime
++        BLUE        ('t', (s, f) -> s.withColor(ChatFormatting.BLUE)), // light blue, teal
++        DARK_GRAY   ('f', (s, f) -> s.withColor(ChatFormatting.DARK_GRAY)),
++        GRAY        ('g', (s, f) -> s.withColor(ChatFormatting.GRAY)),
++        GOLD        ('d', (s, f) -> s.withColor(ChatFormatting.GOLD)),
++        DARK_PURPLE ('p', (s, f) -> s.withColor(ChatFormatting.DARK_PURPLE)), // purple
++        DARK_RED    ('n', (s, f) -> s.withColor(ChatFormatting.DARK_RED)),  // brown
++        DARK_AQUA   ('q', (s, f) -> s.withColor(ChatFormatting.DARK_AQUA)),
++        DARK_GREEN  ('e', (s, f) -> s.withColor(ChatFormatting.DARK_GREEN)),
++        DARK_BLUE   ('v', (s, f) -> s.withColor(ChatFormatting.DARK_BLUE)), // navy
++        BLACK       ('k', (s, f) -> s.withColor(ChatFormatting.BLACK)),
++
++        COLOR       ('#', (s, f) -> {
++            TextColor color = TextColor.parseColor("#"+f);
++            return color == null ? s : s.withColor(color);
++        }, s -> {
++            Matcher m = colorExtract.matcher(s);
++            return m.find() ? m.group(1) : null;
++        }),
++        ;
++
++        public char code;
++        public BiFunction<Style, String, Style> applier;
++        public Function<String, String> container;
++        CarpetFormatting(char code, BiFunction<Style, String, Style> applier)
++        {
++            this(code, applier, s -> s.indexOf(code)>=0?Character.toString(code):null);
++        }
++        CarpetFormatting(char code, BiFunction<Style, String, Style> applier, Function<String, String> container)
++        {
++            this.code = code;
++            this.applier = applier;
++            this.container = container;
++        }
++        public Style apply(String format, Style previous)
++        {
++            String fmt;
++            if ((fmt = container.apply(format))!= null) return applier.apply(previous, fmt);
++            return previous;
++        }
++    };
++
++    public static Style parseStyle(String style)
++    {
++        Style myStyle= Style.EMPTY.withColor(ChatFormatting.WHITE);
++        for (CarpetFormatting cf: CarpetFormatting.values()) myStyle = cf.apply(style, myStyle);
++        return myStyle;
++    }
++    public static String heatmap_color(double actual, double reference)
++    {
++        String color = "g";
++        if (actual >= 0.0D) color = "e";
++        if (actual > 0.5D*reference) color = "y";
++        if (actual > 0.8D*reference) color = "r";
++        if (actual > reference) color = "m";
++        return color;
++    }
++    public static String creatureTypeColor(MobCategory type)
++    {
++        return switch (type)
++            {
++                case MONSTER -> "n";
++                case CREATURE -> "e";
++                case AMBIENT -> "f";
++                case WATER_CREATURE -> "v";
++                case WATER_AMBIENT -> "q";
++                default -> "w"; // missing MISC and UNDERGROUND_WATER_CREATURE
++            };
++    }
++
++    private static MutableComponent getChatComponentFromDesc(String message, MutableComponent previousMessage)
++    {
++        if (message.equalsIgnoreCase(""))
++        {
++            return Component.literal("");
++        }
++        if (Character.isWhitespace(message.charAt(0)))
++        {
++            message = "w" + message;
++        }
++        int limit = message.indexOf(' ');
++        String desc = message;
++        String str = "";
++        if (limit >= 0)
++        {
++            desc = message.substring(0, limit);
++            str = message.substring(limit+1);
++        }
++        if (previousMessage == null) {
++            MutableComponent text = Component.literal(str);
++            text.setStyle(parseStyle(desc));
++            return text;
++        }
++        Style previousStyle = previousMessage.getStyle();
++        MutableComponent ret = previousMessage;
++        previousMessage.setStyle(switch (desc.charAt(0)) {
++            case '?' -> previousStyle.withClickEvent(new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND, message.substring(1)));
++            case '!' -> previousStyle.withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, message.substring(1)));
++            case '^' -> previousStyle.withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, c(message.substring(1))));
++            case '@' -> previousStyle.withClickEvent(new ClickEvent(ClickEvent.Action.OPEN_URL, message.substring(1)));
++            case '&' -> previousStyle.withClickEvent(new ClickEvent(ClickEvent.Action.COPY_TO_CLIPBOARD, message.substring(1)));
++            default  -> { // Create a new component
++                ret = Component.literal(str);
++                ret.setStyle(parseStyle(desc));
++                yield previousStyle; // no op for the previous style
++            }
++        });
++        return ret;
++    }
++    public static Component tp(String desc, Vec3 pos) { return tp(desc, pos.x, pos.y, pos.z); }
++    public static Component tp(String desc, BlockPos pos) { return tp(desc, pos.getX(), pos.getY(), pos.getZ()); }
++    public static Component tp(String desc, double x, double y, double z) { return tp(desc, (float)x, (float)y, (float)z);}
++    public static Component tp(String desc, float x, float y, float z)
++    {
++        return getCoordsTextComponent(desc, x, y, z, false);
++    }
++    public static Component tp(String desc, int x, int y, int z)
++    {
++        return getCoordsTextComponent(desc, x, y, z, true);
++    }
++
++    /// to be continued
++    public static Component dbl(String style, double double_value)
++    {
++        return c(String.format("%s %.1f",style,double_value),String.format("^w %f",double_value));
++    }
++    public static Component dbls(String style, double ... doubles)
++    {
++        StringBuilder str = new StringBuilder(style + " [ ");
++        String prefix = "";
++        for (double dbl : doubles)
++        {
++            str.append(String.format("%s%.1f", prefix, dbl));
++            prefix = ", ";
++        }
++        str.append(" ]");
++        return c(str.toString());
++    }
++    public static Component dblf(String style, double ... doubles)
++    {
++        StringBuilder str = new StringBuilder(style + " [ ");
++        String prefix = "";
++        for (double dbl : doubles)
++        {
++            str.append(String.format("%s%f", prefix, dbl));
++            prefix = ", ";
++        }
++        str.append(" ]");
++        return c(str.toString());
++    }
++    public static Component dblt(String style, double ... doubles)
++    {
++        List<Object> components = new ArrayList<>();
++        components.add(style+" [ ");
++        String prefix = "";
++        for (double dbl:doubles)
++        {
++
++            components.add(String.format("%s %s%.1f",style, prefix, dbl));
++            components.add("?"+dbl);
++            components.add("^w "+dbl);
++            prefix = ", ";
++        }
++        //components.remove(components.size()-1);
++        components.add(style+"  ]");
++        return c(components.toArray(new Object[0]));
++    }
++
++    private static Component getCoordsTextComponent(String style, float x, float y, float z, boolean isInt)
++    {
++        String text;
++        String command;
++        if (isInt)
++        {
++            text = String.format("%s [ %d, %d, %d ]",style, (int)x,(int)y, (int)z );
++            command = String.format("!/tp %d %d %d",(int)x,(int)y, (int)z);
++        }
++        else
++        {
++            text = String.format("%s [ %.1f, %.1f, %.1f]",style, x, y, z);
++            command = String.format("!/tp %.3f %.3f %.3f",x, y, z);
++        }
++        return c(text, command);
++    }
++
++    //message source
++    public static void m(CommandSourceStack source, Object ... fields)
++    {
++        if (source != null)
++            source.sendSuccess(() -> Messenger.c(fields), source.getServer() != null && source.getServer().overworld() != null);
++    }
++    public static void m(Player player, Object ... fields)
++    {
++        player.sendSystemMessage(Messenger.c(fields));
++    }
++
++    /*
++    composes single line, multicomponent message, and returns as one chat messagge
++     */
++    public static Component c(Object ... fields)
++    {
++        MutableComponent message = Component.literal("");
++        MutableComponent previousComponent = null;
++        for (Object o: fields)
++        {
++            if (o instanceof MutableComponent)
++            {
++                message.append((MutableComponent)o);
++                previousComponent = (MutableComponent)o;
++                continue;
++            }
++            String txt = o.toString();
++            MutableComponent comp = getChatComponentFromDesc(txt, previousComponent);
++            if (comp != previousComponent) message.append(comp);
++            previousComponent = comp;
++        }
++        return message;
++    }
++
++    //simple text
++
++    public static Component s(String text)
++    {
++        return s(text,"");
++    }
++    public static Component s(String text, String style)
++    {
++        MutableComponent message = Component.literal(text);
++        message.setStyle(parseStyle(style));
++        return message;
++    }
++
++
++
++
++    public static void send(Player player, Collection<Component> lines)
++    {
++        lines.forEach(message -> player.sendSystemMessage(message));
++    }
++    public static void send(CommandSourceStack source, Collection<Component> lines)
++    {
++        lines.stream().forEachOrdered((s) -> source.sendSuccess(() -> s, false));
++    }
++
++
++    public static void print_server_message(MinecraftServer server, String message)
++    {
++        if (server == null)
++            LOG.error("Message not delivered: "+message);
++        server.sendSystemMessage(Component.literal(message));
++        Component txt = c("gi "+message);
++        for (Player entityplayer : server.getPlayerList().getPlayers())
++        {
++            entityplayer.sendSystemMessage(txt);
++        }
++    }
++    public static void print_server_message(MinecraftServer server, Component message)
++    {
++        if (server == null)
++            LOG.error("Message not delivered: "+message.getString());
++        server.sendSystemMessage(message);
++        for (Player entityplayer : server.getPlayerList().getPlayers())
++        {
++            entityplayer.sendSystemMessage(message);
++        }
++    }
++}
+diff --git a/src/main/java/net/minecraft/serversidereplayrecorder/NetHandlerPlayServerFake.java b/src/main/java/net/minecraft/serversidereplayrecorder/NetHandlerPlayServerFake.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..d996182b7cd2a05108e2f135c0732927bf996e6e
+--- /dev/null
++++ b/src/main/java/net/minecraft/serversidereplayrecorder/NetHandlerPlayServerFake.java
+@@ -0,0 +1,47 @@
++package net.minecraft.serversidereplayrecorder;
++
++import net.minecraft.network.Connection;
++import net.minecraft.network.chat.Component;
++import net.minecraft.network.chat.contents.TranslatableContents;
++import net.minecraft.network.protocol.Packet;
++import net.minecraft.server.MinecraftServer;
++import net.minecraft.server.network.ServerGamePacketListenerImpl;
++import net.minecraft.serversidereplayrecorder.util.interfaces.RecorderHolder;
++import net.minecraft.world.entity.RelativeMovement;
++
++import java.util.Optional;
++import java.util.Set;
++
++public class NetHandlerPlayServerFake extends ServerGamePacketListenerImpl
++{
++    public NetHandlerPlayServerFake(MinecraftServer server, Connection cc, EntityPlayerMPFake playerIn)
++    {
++        super(server, cc, playerIn);
++    }
++
++    @Override
++    public void send(final Packet<?> packetIn)
++    {
++        Optional.ofNullable(((RecorderHolder)this).getRecorder()).ifPresent(r->r.onPacket(packetIn));
++    }
++
++    @Override
++    public void disconnect(Component message)
++    {
++        if (message.getContents() instanceof TranslatableContents text && (text.getKey().equals("multiplayer.disconnect.idling") || text.getKey().equals("multiplayer.disconnect.duplicate_login")))
++        {
++            ((EntityPlayerMPFake) player).kill(message);
++        }
++    }
++
++    @Override
++    public void teleport(double d, double e, double f, float g, float h, Set<RelativeMovement> set)
++    {
++        super.teleport(d, e, f, g, h, set);
++        if (player.serverLevel().getPlayerByUUID(player.getUUID()) != null) {
++            resetPosition();
++            player.serverLevel().getChunkSource().move(player);
++        }
++    }
++
++}
+diff --git a/src/main/java/net/minecraft/serversidereplayrecorder/ServerPlayerInterface.java b/src/main/java/net/minecraft/serversidereplayrecorder/ServerPlayerInterface.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..965838968f76123e4774be7e32588f26bb7da45b
+--- /dev/null
++++ b/src/main/java/net/minecraft/serversidereplayrecorder/ServerPlayerInterface.java
+@@ -0,0 +1,9 @@
++package net.minecraft.serversidereplayrecorder;
++
++public interface ServerPlayerInterface
++{
++    EntityPlayerActionPack getActionPack();
++    void invalidateEntityObjectReference();
++    boolean isInvalidEntityObject();
++    String getLanguage();
++}
+diff --git a/src/main/java/net/minecraft/serversidereplayrecorder/Tracer.java b/src/main/java/net/minecraft/serversidereplayrecorder/Tracer.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..6f7d8cdb961ebda1345633d7893e27285e7849b3
+--- /dev/null
++++ b/src/main/java/net/minecraft/serversidereplayrecorder/Tracer.java
+@@ -0,0 +1,90 @@
++package net.minecraft.serversidereplayrecorder;
++
++import java.util.Optional;
++import java.util.function.Predicate;
++
++import net.minecraft.world.entity.Entity;
++import net.minecraft.world.level.ClipContext;
++import net.minecraft.world.level.Level;
++import net.minecraft.world.phys.AABB;
++import net.minecraft.world.phys.BlockHitResult;
++import net.minecraft.world.phys.EntityHitResult;
++import net.minecraft.world.phys.HitResult;
++import net.minecraft.world.phys.Vec3;
++
++public class Tracer
++{
++    public static HitResult rayTrace(Entity source, float partialTicks, double reach, boolean fluids)
++    {
++        BlockHitResult blockHit = rayTraceBlocks(source, partialTicks, reach, fluids);
++        double maxSqDist = reach * reach;
++        if (blockHit != null)
++        {
++            maxSqDist = blockHit.getLocation().distanceToSqr(source.getEyePosition(partialTicks));
++        }
++        EntityHitResult entityHit = rayTraceEntities(source, partialTicks, reach, maxSqDist);
++        return entityHit == null ? blockHit : entityHit;
++    }
++
++    public static BlockHitResult rayTraceBlocks(Entity source, float partialTicks, double reach, boolean fluids)
++    {
++        Vec3 pos = source.getEyePosition(partialTicks);
++        Vec3 rotation = source.getViewVector(partialTicks);
++        Vec3 reachEnd = pos.add(rotation.x * reach, rotation.y * reach, rotation.z * reach);
++        return source.level().clip(new ClipContext(pos, reachEnd, ClipContext.Block.OUTLINE, fluids ?
++            ClipContext.Fluid.ANY : ClipContext.Fluid.NONE, source));
++    }
++
++    public static EntityHitResult rayTraceEntities(Entity source, float partialTicks, double reach, double maxSqDist)
++    {
++        Vec3 pos = source.getEyePosition(partialTicks);
++        Vec3 reachVec = source.getViewVector(partialTicks).scale(reach);
++        AABB box = source.getBoundingBox().expandTowards(reachVec).inflate(1);
++        return rayTraceEntities(source, pos, pos.add(reachVec), box, e -> !e.isSpectator() && e.isPickable(), maxSqDist);
++    }
++
++    public static EntityHitResult rayTraceEntities(Entity source, Vec3 start, Vec3 end, AABB box, Predicate<Entity> predicate, double maxSqDistance)
++    {
++        Level world = source.level();
++        double targetDistance = maxSqDistance;
++        Entity target = null;
++        Vec3 targetHitPos = null;
++        for (Entity current : world.getEntities(source, box, predicate))
++        {
++            AABB currentBox = current.getBoundingBox().inflate(current.getPickRadius());
++            Optional<Vec3> currentHit = currentBox.clip(start, end);
++            if (currentBox.contains(start))
++            {
++                if (targetDistance >= 0)
++                {
++                    target = current;
++                    targetHitPos = currentHit.orElse(start);
++                    targetDistance = 0;
++                }
++            }
++            else if (currentHit.isPresent())
++            {
++                Vec3 currentHitPos = currentHit.get();
++                double currentDistance = start.distanceToSqr(currentHitPos);
++                if (currentDistance < targetDistance || targetDistance == 0)
++                {
++                    if (current.getRootVehicle() == source.getRootVehicle())
++                    {
++                        if (targetDistance == 0)
++                        {
++                            target = current;
++                            targetHitPos = currentHitPos;
++                        }
++                    }
++                    else
++                    {
++                        target = current;
++                        targetHitPos = currentHitPos;
++                        targetDistance = currentDistance;
++                    }
++                }
++            }
++        }
++        return target == null ? null : new EntityHitResult(target, targetHitPos);
++    }
++}
+diff --git a/src/main/java/net/minecraft/serversidereplayrecorder/mixin/player/NetHandlerPlayServerFakeMixin.java b/src/main/java/net/minecraft/serversidereplayrecorder/mixin/player/NetHandlerPlayServerFakeMixin.java
+deleted file mode 100644
+index 66499a58fbf4438becec460dd4566d91a69158a2..0000000000000000000000000000000000000000
+--- a/src/main/java/net/minecraft/serversidereplayrecorder/mixin/player/NetHandlerPlayServerFakeMixin.java
++++ /dev/null
+@@ -1,25 +0,0 @@
+-package net.minecraft.serversidereplayrecorder.mixin.player;
+-
+-import carpet.patches.NetHandlerPlayServerFake;
+-import com.thecolonel63.serversidereplayrecorder.util.interfaces.RecorderHolder;
+-import net.minecraft.network.packet.Packet;
+-import org.spongepowered.asm.mixin.Mixin;
+-import org.spongepowered.asm.mixin.injection.At;
+-import org.spongepowered.asm.mixin.injection.Inject;
+-import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+-
+-import java.util.Optional;
+-
+-import static com.thecolonel63.serversidereplayrecorder.recorder.PlayerRecorder.playerRecorderMap;
+-
+-@Mixin(NetHandlerPlayServerFake.class)
+-public abstract class NetHandlerPlayServerFakeMixin {
+-
+-    @Inject(method = "sendPacket", at = @At("TAIL"), require = 0)
+-    private void savePacket(Packet<?> packet, CallbackInfo ci) {
+-        //Get the recorder instance dedicated to this connection and give it the packet to record.
+-        //If there is no recorder instance for this connection, don't do anything.
+-        Optional.ofNullable(((RecorderHolder)this).getRecorder()).ifPresent(r->r.onPacket(packet));
+-    }
+-
+-}

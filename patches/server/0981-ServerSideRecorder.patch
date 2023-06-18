@@ -1,0 +1,19 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Bryan1029384756 <23323626+Bryan1029384756@users.noreply.github.com>
+Date: Sat, 17 Jun 2023 23:46:08 -0500
+Subject: [PATCH] ServerSideRecorder
+
+
+diff --git a/src/main/java/net/minecraft/server/players/PlayerList.java b/src/main/java/net/minecraft/server/players/PlayerList.java
+index 36f6aef11f3c08ab544083d29b7253da696945b6..7c410323a7af92a89dd5a679e6bab160862f5db0 100644
+--- a/src/main/java/net/minecraft/server/players/PlayerList.java
++++ b/src/main/java/net/minecraft/server/players/PlayerList.java
+@@ -1191,7 +1191,7 @@ public abstract class PlayerList {
+         //Serversiderecorder start
+ 
+         if (player != null) {
+-            ReplayRecorder recorder = ((RecorderHolder)(((ServerPlayer) player).connection)).getRecorder();
++            ReplayRecorder recorder = ((RecorderHolder)(((ServerPlayer) player).connection.connection)).getRecorder();
+             if (recorder != null) {
+                 recorder.onPacket(packet);
+             }

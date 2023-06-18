@@ -1,0 +1,126 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Bryan1029384756 <23323626+Bryan1029384756@users.noreply.github.com>
+Date: Sat, 17 Jun 2023 23:37:21 -0500
+Subject: [PATCH] ServerSideRecorder
+
+
+diff --git a/src/main/java/net/minecraft/server/level/ChunkMap.java b/src/main/java/net/minecraft/server/level/ChunkMap.java
+index 60f77d4f519cf0864ce8a01fdc7bebd5fe548e01..8a2fae854e07482fd5cd372ab12571618fdbeacb 100644
+--- a/src/main/java/net/minecraft/server/level/ChunkMap.java
++++ b/src/main/java/net/minecraft/server/level/ChunkMap.java
+@@ -1336,7 +1336,7 @@ public class ChunkMap extends ChunkStorage implements ChunkHolder.PlayerProvider
+             }
+             level.timings.tracker2.stopTiming(); // Paper
+         }
+-        ((RegionRecorderEntityTracker)playerchunkmap_entitytracker).updateTrackedStatus(((RegionRecorderWorld)playerchunkmap_entitytracker.entity.level()).getRegionRecorders()); //Seversiderecorder
++        ((RegionRecorderEntityTracker)this.entityMap).updateTrackedStatus(((RegionRecorderWorld)this.level).getRegionRecorders()); //Seversiderecorder
+     }
+ 
+     public void broadcast(Entity entity, Packet<?> packet) {
+@@ -1464,6 +1464,7 @@ public class ChunkMap extends ChunkStorage implements ChunkHolder.PlayerProvider
+             this.recorder = new WeakReference<>(recorder);
+             //send the spawn packets when the tracker is creaed
+             //works also for dimension change as a new tracker is created while changing dimension
++
+             if (recorder != null) {
+                 serverEntity.sendPairingData(null, recorder::onPacket);
+             }
+diff --git a/src/main/java/net/minecraft/server/level/ServerEntity.java b/src/main/java/net/minecraft/server/level/ServerEntity.java
+index 6670e657e08e130f7e0368f418379fd1ece00cdf..27edf4a0eb3caed5923fd1187c4da1472f77a959 100644
+--- a/src/main/java/net/minecraft/server/level/ServerEntity.java
++++ b/src/main/java/net/minecraft/server/level/ServerEntity.java
+@@ -308,11 +308,13 @@ public class ServerEntity {
+         if (this.entity instanceof LivingEntity) {
+             Collection<AttributeInstance> collection = ((LivingEntity) this.entity).getAttributes().getSyncableAttributes();
+ 
+-            // CraftBukkit start - If sending own attributes send scaled health instead of current maximum health
+-            if (this.entity.getId() == player.getId()) {
+-                ((ServerPlayer) this.entity).getBukkitEntity().injectScaledMaxHealth(collection, false);
++            if(player != null){
++                // CraftBukkit start - If sending own attributes send scaled health instead of current maximum health
++                if (this.entity.getId() == player.getId()) {
++                    ((ServerPlayer) this.entity).getBukkitEntity().injectScaledMaxHealth(collection, false);
++                }
++                // CraftBukkit end
+             }
+-            // CraftBukkit end
+ 
+             if (!collection.isEmpty()) {
+                 sender.accept(new ClientboundUpdateAttributesPacket(this.entity.getId(), collection));
+diff --git a/src/main/java/net/minecraft/server/players/PlayerList.java b/src/main/java/net/minecraft/server/players/PlayerList.java
+index 134b4ce9bec37f71cec4046ed091a0fc4decaba6..36f6aef11f3c08ab544083d29b7253da696945b6 100644
+--- a/src/main/java/net/minecraft/server/players/PlayerList.java
++++ b/src/main/java/net/minecraft/server/players/PlayerList.java
+@@ -171,8 +171,8 @@ public abstract class PlayerList {
+ 
+     public void placeNewPlayer(Connection connection, ServerPlayer player) {
+         //ServerSideReplayRecorder start
+-        if (ServerSideReplayRecorderServer.config.isRecording_enabled() && !PlayerRecorder.playerRecorderMap.containsKey(connection)
+-            && ( ServerSideReplayRecorderServer.config.getRecordable_users().contains(player.getGameProfile().getName())) != ServerSideReplayRecorderServer.config.invert_user_list() ) {
++       // if (ServerSideReplayRecorderServer.config.isRecording_enabled() && !PlayerRecorder.playerRecorderMap.containsKey(connection)
++       //     && ( ServerSideReplayRecorderServer.config.getRecordable_users().contains(player.getGameProfile().getName())) != ServerSideReplayRecorderServer.config.invert_user_list() ) {
+             try {
+                 ServerSideReplayRecorderServer.LOGGER.info("Started Recording Player %s".formatted(player.getGameProfile().getName()));
+ 
+@@ -183,7 +183,7 @@ public abstract class PlayerList {
+             } catch (IOException e) {
+                 e.printStackTrace();
+             }
+-        }
++       // }
+         //ServerSideReplayRecorder end
+ 
+         player.isRealPlayer = true; // Paper
+diff --git a/src/main/java/net/minecraft/serversidereplayrecorder/ServerSideReplayRecorderServer.java b/src/main/java/net/minecraft/serversidereplayrecorder/ServerSideReplayRecorderServer.java
+index 198841e836943e20e65d75a432884b709c9e405f..9a5ae6b35154bc7cc634306ae3534beca47cb170 100644
+--- a/src/main/java/net/minecraft/serversidereplayrecorder/ServerSideReplayRecorderServer.java
++++ b/src/main/java/net/minecraft/serversidereplayrecorder/ServerSideReplayRecorderServer.java
+@@ -69,8 +69,8 @@ public class ServerSideReplayRecorderServer {
+ //    }
+ 
+     public static String getConfigDirectory(){
+-        System.out.println(System.getProperty("user.dir") + "/config");
+-        return System.getProperty("user.dir") + "/config";
++        System.out.println(System.getProperty("user.dir") + "\\config");
++        return System.getProperty("user.dir") + "\\config";
+     }
+ 
+     public static String getDirectory(){
+diff --git a/src/main/java/net/minecraft/serversidereplayrecorder/command/ReplayCommand.java b/src/main/java/net/minecraft/serversidereplayrecorder/command/ReplayCommand.java
+index f1efdd1fa54243110efc6719c3c75c33fdac3199..50634cba3a60eea3d8474c88e8a34f1c97c8fdf0 100644
+--- a/src/main/java/net/minecraft/serversidereplayrecorder/command/ReplayCommand.java
++++ b/src/main/java/net/minecraft/serversidereplayrecorder/command/ReplayCommand.java
+@@ -180,7 +180,7 @@ public class ReplayCommand {
+                                                     });
+                                                     if (count.get() > 0) {
+                                                         source.sendSuccess(()->Component.literal("Added players will start recording next time they join the server"), true);
+-                                                        ServerSideReplayRecorderServer.saveConfig();
++                                                        //ServerSideReplayRecorderServer.saveConfig();
+                                                     }
+                                                     return 0;
+                                                 })
+@@ -211,7 +211,7 @@ public class ReplayCommand {
+                                                     });
+                                                     if (count.get() > 0) {
+                                                         source.sendSuccess(()->Component.literal("Removed players will stop recording on logout"), true);
+-                                                        ServerSideReplayRecorderServer.saveConfig();
++                                                       // ServerSideReplayRecorderServer.saveConfig();
+                                                     }
+                                                     return 0;
+                                                 })
+@@ -278,13 +278,13 @@ public class ReplayCommand {
+                                 .then(Commands.literal("enable").executes(context -> {
+                                     ServerSideReplayRecorderServer.config.setRecording_enabled(true);
+                                     context.getSource().sendSuccess(()->Component.literal("Recording " + ((ServerSideReplayRecorderServer.config.isRecording_enabled()) ? "Enabled" : "Disabled")), true);
+-                                    ServerSideReplayRecorderServer.saveConfig();
++                                   // ServerSideReplayRecorderServer.saveConfig();
+                                     return 0;
+                                 }))
+                                 .then(Commands.literal("disable").executes(context -> {
+                                     ServerSideReplayRecorderServer.config.setRecording_enabled(false);
+                                     context.getSource().sendSuccess(()->Component.literal("Recording " + ((ServerSideReplayRecorderServer.config.isRecording_enabled()) ? "Enabled" : "Disabled")), true);
+-                                    ServerSideReplayRecorderServer.saveConfig();
++                                   // ServerSideReplayRecorderServer.saveConfig();
+                                     return 0;
+                                 }))
+                 ).then(

@@ -1,0 +1,280 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Bryan1029384756 <23323626+Bryan1029384756@users.noreply.github.com>
+Date: Sat, 17 Jun 2023 23:00:30 -0500
+Subject: [PATCH] ServerSideRecorder
+
+
+diff --git a/src/main/java/net/minecraft/serversidereplayrecorder/ServerSideReplayRecorderServer.java b/src/main/java/net/minecraft/serversidereplayrecorder/ServerSideReplayRecorderServer.java
+index be30a4f207069228d62990614bfcea30415a7e62..198841e836943e20e65d75a432884b709c9e405f 100644
+--- a/src/main/java/net/minecraft/serversidereplayrecorder/ServerSideReplayRecorderServer.java
++++ b/src/main/java/net/minecraft/serversidereplayrecorder/ServerSideReplayRecorderServer.java
+@@ -8,6 +8,7 @@ import org.slf4j.Logger;
+ import org.slf4j.LoggerFactory;
+ 
+ import java.io.*;
++import java.nio.file.Path;
+ import java.util.ResourceBundle;
+ import java.util.concurrent.ExecutorService;
+ import java.util.concurrent.Executors;
+@@ -15,57 +16,68 @@ import java.util.concurrent.Executors;
+ public class ServerSideReplayRecorderServer {
+ 
+     static {
+-        YAMLFactoryBuilder builder = YAMLFactory.builder();
+-        builder.disable(YAMLGenerator.Feature.WRITE_DOC_START_MARKER);
+-        builder.enable(YAMLGenerator.Feature.INDENT_ARRAYS_WITH_INDICATOR);
+-        yaml = new ObjectMapper(builder.build()).configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+-        placeholders = ResourceBundle.getBundle("placeholders");
+-        upload_sites = ResourceBundle.getBundle("upload_sites");
++//        YAMLFactoryBuilder builder = YAMLFactory.builder();
++//        builder.disable(YAMLGenerator.Feature.WRITE_DOC_START_MARKER);
++//        builder.enable(YAMLGenerator.Feature.INDENT_ARRAYS_WITH_INDICATOR);
++//        yaml = new ObjectMapper(builder.build()).configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
++//        placeholders = ResourceBundle.getBundle("placeholders");
++//        upload_sites = ResourceBundle.getBundle("upload_sites");
+     }
+ 
+     public static final ExecutorService recorderExecutor = Executors.newSingleThreadExecutor(new DefaultThreadFactory("Replay",true));
+ 
+-    private static final ObjectMapper yaml;
+-
+-    public static final ResourceBundle placeholders;
+-    public static final ResourceBundle upload_sites;
++//    private static final ObjectMapper yaml;
++//
++//    public static final ResourceBundle placeholders;
++//    public static final ResourceBundle upload_sites;
+ 
+     public static final Logger LOGGER = LoggerFactory.getLogger(ServerSideReplayRecorderServer.class.getName());
+ 
+     public static MinecraftServer server;
+ 
+-    public static final String configPath = FabricLoader.getInstance().getConfigDir() + "/ServerSideReplayRecorder.yml";
++    public static final String configPath = getConfigDirectory() + "/ServerSideReplayRecorder.yml";
+     public static MainConfig config = new MainConfig();
+ 
+-    public static void loadConfig() {
+-        try {
+-
+-            yaml.findAndRegisterModules();
+-            config = yaml.readValue(new FileReader(configPath), MainConfig.class);
+-
+-        }catch (FileNotFoundException e){
+-            System.out.println("Config file not found, creating with default values...");
+-            saveConfig();
+-        }catch (Throwable t){
+-            throw new RuntimeException(t);
+-        }
++//    public static void loadConfig() {
++//        try {
++//            yaml.findAndRegisterModules();
++//            config = yaml.readValue(new FileReader(configPath), MainConfig.class);
++//
++//        }catch (FileNotFoundException e){
++//            System.out.println("Config file not found, creating with default values...");
++//            saveConfig();
++//        }catch (Throwable t){
++//            throw new RuntimeException(t);
++//        }
++//    }
++//
++//    public static void saveConfig() {
++//        try {
++//            yaml.findAndRegisterModules();
++//            //noinspection ResultOfMethodCallIgnored
++//
++//            new File(getConfigDirectory()).mkdirs();
++//            BufferedWriter writer = new BufferedWriter(new FileWriter(configPath));
++//            writer.write("#Config for Server Side Replay Recorder\n");
++//            writer.write("##WARNING any comments in this file might get deleted\n");
++//            writer.write("\n");
++//            yaml.writeValue(writer, config);
++//            writer.close();
++//        } catch (IOException ioException) {
++//            ioException.printStackTrace();
++//        }
++//    }
++
++    public static String getConfigDirectory(){
++        System.out.println(System.getProperty("user.dir") + "/config");
++        return System.getProperty("user.dir") + "/config";
+     }
+ 
+-    public static void saveConfig() {
+-        try {
+-            yaml.findAndRegisterModules();
+-            //noinspection ResultOfMethodCallIgnored
+-            new File(FabricLoader.getInstance().getConfigDir().toString()).mkdirs();
+-            BufferedWriter writer = new BufferedWriter(new FileWriter(configPath));
+-            writer.write("#Config for Server Side Replay Recorder\n");
+-            writer.write("##WARNING any comments in this file might get deleted\n");
+-            writer.write("\n");
+-            yaml.writeValue(writer, config);
+-            writer.close();
+-        } catch (IOException ioException) {
+-            ioException.printStackTrace();
+-        }
++    public static String getDirectory(){
++        System.out.println(System.getProperty("user.dir"));
++        return System.getProperty("user.dir");
+     }
++
+     public static void registerServer(MinecraftServer mcServer) {
+         server = mcServer;
+         //fixStoppedReplays();
+@@ -73,7 +85,7 @@ public class ServerSideReplayRecorderServer {
+ 
+     public void onInitialize() {
+         LOGGER.info(ServerSideReplayRecorderServer.class.getSimpleName() + " loaded");
+-        loadConfig();
++        //loadConfig();
+     }
+ 
+ }
+diff --git a/src/main/java/net/minecraft/serversidereplayrecorder/recorder/PlayerRecorder.java b/src/main/java/net/minecraft/serversidereplayrecorder/recorder/PlayerRecorder.java
+index a417433aa83be221fd26f5ef8a3197ca48fb408a..0b89881480c14f44b5943c547606ff2bbc6b9bab 100644
+--- a/src/main/java/net/minecraft/serversidereplayrecorder/recorder/PlayerRecorder.java
++++ b/src/main/java/net/minecraft/serversidereplayrecorder/recorder/PlayerRecorder.java
+@@ -12,6 +12,7 @@ import net.minecraft.serversidereplayrecorder.ServerSideReplayRecorderServer;
+ import net.minecraft.serversidereplayrecorder.util.WrappedPacket;
+ import net.minecraft.serversidereplayrecorder.util.interfaces.LightUpdatePacketAccessor;
+ import net.minecraft.world.entity.player.Player;
++import net.minecraft.world.level.storage.LevelStorageSource;
+ 
+ import java.io.File;
+ import java.io.IOException;
+@@ -39,6 +40,8 @@ public class PlayerRecorder extends ReplayRecorder {
+         return this.playerName;
+     }
+ 
++
++
+     @Override
+     protected String getSaveFolder() {
+         String name;
+@@ -51,7 +54,7 @@ public class PlayerRecorder extends ReplayRecorder {
+         if (new File(ServerSideReplayRecorderServer.config.getReplay_folder_name()).isAbsolute())
+             return Paths.get(ServerSideReplayRecorderServer.config.getReplay_folder_name(), PLAYER_FOLDER, name).toString();
+         else
+-            return Paths.get(FabricLoader.getInstance().getGameDir().toString(), ServerSideReplayRecorderServer.config.getReplay_folder_name(), PLAYER_FOLDER, name).toString();
++            return Paths.get(ServerSideReplayRecorderServer.getDirectory(), ServerSideReplayRecorderServer.config.getReplay_folder_name(), PLAYER_FOLDER, name).toString();
+     }
+ 
+ 
+diff --git a/src/main/java/net/minecraft/serversidereplayrecorder/recorder/RegionRecorder.java b/src/main/java/net/minecraft/serversidereplayrecorder/recorder/RegionRecorder.java
+index 04b34176da3ab7fc62ca33212e2de41776bf8ea1..ffdbd36015553ca8d15d55803c945f8949f234f0 100644
+--- a/src/main/java/net/minecraft/serversidereplayrecorder/recorder/RegionRecorder.java
++++ b/src/main/java/net/minecraft/serversidereplayrecorder/recorder/RegionRecorder.java
+@@ -23,7 +23,9 @@ import net.minecraft.world.flag.FeatureFlags;
+ import net.minecraft.world.item.ItemStack;
+ import net.minecraft.world.level.ChunkPos;
+ import net.minecraft.world.level.GameRules;
++import net.minecraft.world.level.GameType;
+ import net.minecraft.world.level.border.WorldBorder;
++import net.minecraft.world.level.chunk.ChunkAccess;
+ import net.minecraft.world.level.chunk.ChunkStatus;
+ import net.minecraft.world.level.chunk.ImposterProtoChunk;
+ import net.minecraft.world.level.chunk.LevelChunk;
+@@ -97,26 +99,26 @@ public class RegionRecorder extends ReplayRecorder {
+         onPacket(new ClientboundLoginPacket(
+                 0,
+                 worldProperties.isHardcore(),
+-                GameMode.SPECTATOR,
+-                GameMode.SPECTATOR,
++                GameType.SPECTATOR,
++                 GameType.SPECTATOR,
+                 ms.levelKeys(),
+-                ms.registryAccess().toImmutable(),
+-                world.getDimensionKey(),
+-                world.getRegistryKey(),
++                ms.registryAccess().freeze(),
++                world.dimensionTypeId(),
++                world.dimension(),
+                 world.getSeed(),
+                 ms.getMaxPlayers(),
+                 region.radius,
+                 region.radius,
+                 false,
+                 false,
+-                world.isDebugWorld(),
++                world.isDebug(),
+                 world.isFlat(),
+                 Optional.empty(),
+                 0
+         ));
+         onPacket(new ClientboundUpdateEnabledFeaturesPacket(FeatureFlags.REGISTRY.toNames(world.enabledFeatures())));
+         onPacket(
+-                new ClientboundCustomPayloadPacket(ClientboundCustomPayloadPacket.BRAND, new FriendlyByteBuf(Unpooled.buffer()).writeString(ms.getServerModName()))
++                new ClientboundCustomPayloadPacket(ClientboundCustomPayloadPacket.BRAND, new FriendlyByteBuf(Unpooled.buffer()).writeUtf(ms.getServerModName()))
+         );
+         onPacket(new ClientboundChangeDifficultyPacket(worldProperties.getDifficulty(), worldProperties.isDifficultyLocked()));
+         onPacket(new ClientboundPlayerAbilitiesPacket(new Abilities()));
+@@ -130,12 +132,12 @@ public class RegionRecorder extends ReplayRecorder {
+         //save world ( dimension ) information
+         WorldBorder worldBorder = world.getWorldBorder();
+         onPacket(new ClientboundInitializeBorderPacket(worldBorder));
+-        onPacket(new ClientboundSetTimePacket(world.getTime(), world.getTimeOfDay(), world.getGameRules().getBoolean(GameRules.RULE_DAYLIGHT)));
+-        onPacket(new ClientboundSetDefaultSpawnPositionPacket(world.getSpawnPos(), world.getSpawnAngle()));
++        onPacket(new ClientboundSetTimePacket(world.getGameTime(), world.getDayTime(), world.getGameRules().getBoolean(GameRules.RULE_DAYLIGHT)));
++        onPacket(new ClientboundSetDefaultSpawnPositionPacket(world.getSharedSpawnPos(), world.getSharedSpawnAngle()));
+         if (world.isRaining()) {
+             onPacket(new ClientboundGameEventPacket(ClientboundGameEventPacket.START_RAINING, ClientboundGameEventPacket.DEMO_PARAM_INTRO));
+-            onPacket(new ClientboundGameEventPacket(ClientboundGameEventPacket.RAIN_LEVEL_CHANGE, world.getRainGradient(1.0F)));
+-            onPacket(new ClientboundGameEventPacket(ClientboundGameEventPacket.THUNDER_LEVEL_CHANGE, world.getThunderGradient(1.0F)));
++            onPacket(new ClientboundGameEventPacket(ClientboundGameEventPacket.RAIN_LEVEL_CHANGE, world.getRainLevel(1.0F)));
++            onPacket(new ClientboundGameEventPacket(ClientboundGameEventPacket.THUNDER_LEVEL_CHANGE, world.getThunderLevel(1.0F)));
+         }
+         ms
+                 .getServerResourcePack()
+@@ -170,7 +172,7 @@ public class RegionRecorder extends ReplayRecorder {
+         for (ChunkPos pos : this.region.expandedChunks ){
+             //get chunk, load if needed, no create
+             //this call is deferred to the MainServer executor which runs at the end of a tick in the spare time
+-            Chunk chunk = world.getChunk(pos.x,pos.z, ChunkStatus.EMPTY);
++            ChunkAccess chunk = world.getChunk(pos.x,pos.z, ChunkStatus.EMPTY);
+             LevelChunk worldChunk = null;
+             if (chunk instanceof  LevelChunk)
+                 worldChunk = (LevelChunk) chunk;
+@@ -183,17 +185,17 @@ public class RegionRecorder extends ReplayRecorder {
+                 if (pos.equals(this.region.center)) {
+ 
+                     //find the highest non-transparent block as viewpoint
+-                    int surface_y = worldChunk.sampleHeightmap(Heightmap.Type.MOTION_BLOCKING, viewpoint.getX(), viewpoint.getZ());
++                    int surface_y = worldChunk.getHeight(Heightmap.Types.MOTION_BLOCKING, viewpoint.getX(), viewpoint.getZ());
+                     BlockPos b_pos = new BlockPos(viewpoint.getX(), surface_y, viewpoint.getZ());
+                     while (!worldChunk.getBlockState(b_pos).isOpaque() && surface_y != chunk.getMinBuildHeight()) {
+                         b_pos = new BlockPos(viewpoint.getX(), --surface_y, viewpoint.getZ());
+                     }
+                     //if no blocks are found in the column keep the original viewpoint
+-                    if (surface_y != chunk.getBottomY())
++                    if (surface_y != chunk.getMinBuildHeight())
+                         this.viewpoint = new Vec3i(viewpoint.getX(), surface_y + 1, viewpoint.getZ());
+                 }
+                 //save chunk
+-                onPacket(new WrappedPacket(new ClientboundLevelChunkWithLightPacket(worldChunk, world.getLightingProvider(), null, null)));
++                onPacket(new WrappedPacket(new ClientboundLevelChunkWithLightPacket(worldChunk, world.getLightEngine(), null, null)));
+                 //--obsolete in new versions
+                 //onPacket(new WrappedPacket(new LightUpdateS2CPacket(pos, world.getLightingProvider(), null, null, true)));
+                 known_chunk_data.add(pos);
+@@ -256,7 +258,7 @@ public class RegionRecorder extends ReplayRecorder {
+         if (new File(ServerSideReplayRecorderServer.config.getReplay_folder_name()).isAbsolute())
+             return Paths.get(ServerSideReplayRecorderServer.config.getReplay_folder_name(), REGION_FOLDER,name).toString();
+         else
+-            return Paths.get(FabricLoader.getInstance().getGameDir().toString(), ServerSideReplayRecorderServer.config.getReplay_folder_name(), REGION_FOLDER,name).toString();
++            return Paths.get(ServerSideReplayRecorderServer.getDirectory(), ServerSideReplayRecorderServer.config.getReplay_folder_name(), REGION_FOLDER,name).toString();
+     }
+ 
+     @Override
+diff --git a/src/main/java/net/minecraft/serversidereplayrecorder/recorder/ReplayRecorder.java b/src/main/java/net/minecraft/serversidereplayrecorder/recorder/ReplayRecorder.java
+index 7a28f357e71c4c964de200557182222d2fbd6665..d6f1308bc76895094dc07f71ba00b1ace427d494 100644
+--- a/src/main/java/net/minecraft/serversidereplayrecorder/recorder/ReplayRecorder.java
++++ b/src/main/java/net/minecraft/serversidereplayrecorder/recorder/ReplayRecorder.java
+@@ -84,7 +84,7 @@ public abstract class ReplayRecorder {
+         if (new File(ServerSideReplayRecorderServer.config.getReplay_folder_name()).isAbsolute())
+             tmp_folder = Paths.get(ServerSideReplayRecorderServer.config.getReplay_folder_name(), "recording_" + this.hashCode()).toFile();
+         else
+-            tmp_folder = Paths.get(FabricLoader.getInstance().getGameDir().toString(), ServerSideReplayRecorderServer.config.getReplay_folder_name(), "recording_" + this.hashCode()).toFile();
++            tmp_folder = Paths.get(ServerSideReplayRecorderServer.getDirectory(), ServerSideReplayRecorderServer.config.getReplay_folder_name(), "recording_" + this.hashCode()).toFile();
+         tmp_folder.mkdirs();
+         recording_file= Paths.get(tmp_folder.getAbsolutePath(), "recording.tmcpr").toFile();
+         fileName = String.format("%s.mcpr", new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss").format(new Date()));

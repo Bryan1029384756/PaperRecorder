@@ -1,0 +1,375 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Bryan1029384756 <23323626+Bryan1029384756@users.noreply.github.com>
+Date: Sun, 18 Jun 2023 20:06:05 -0500
+Subject: [PATCH] ServerSideRecorder
+
+
+diff --git a/src/main/java/net/minecraft/network/Connection.java b/src/main/java/net/minecraft/network/Connection.java
+index f33001bcf5e807eda9e66d9c601c5a98c6ce9ae4..6938fa3763783c6e12d23b1c7c74f4ff6688de03 100644
+--- a/src/main/java/net/minecraft/network/Connection.java
++++ b/src/main/java/net/minecraft/network/Connection.java
+@@ -42,7 +42,9 @@ import net.minecraft.network.protocol.Packet;
+ import net.minecraft.network.protocol.PacketFlow;
+ import net.minecraft.network.protocol.game.ClientboundDisconnectPacket;
+ import net.minecraft.network.protocol.login.ClientboundLoginDisconnectPacket;
++import net.minecraft.server.MinecraftServer;
+ import net.minecraft.server.RunningOnDifferentThreadException;
++import net.minecraft.serversidereplayrecorder.ServerSideReplayRecorderServer;
+ import net.minecraft.serversidereplayrecorder.recorder.ReplayRecorder;
+ import net.minecraft.serversidereplayrecorder.util.interfaces.RecorderHolder;
+ import net.minecraft.util.LazyLoadedValue;
+@@ -89,11 +91,13 @@ public class Connection extends SimpleChannelInboundHandler<Packet<?>> implement
+ 
+     @Override
+     public void setRecorder(ReplayRecorder recorder){
++        if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("Connection.setRecorder: ");
+         this.recorder = new WeakReference<>(recorder);
+     }
+ 
+     @Override
+     public ReplayRecorder getRecorder() {
++        if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("Connection.getRecorder: ");
+         return this.recorder.get();
+     }
+     //Serversiderecorder end
+@@ -433,9 +437,13 @@ public class Connection extends SimpleChannelInboundHandler<Packet<?>> implement
+         // Paper end
+ 
+         //Serversiderecorder start
++        if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("Connection.send: ");
+         ReplayRecorder recorder = this.recorder.get();
+         if (recorder != null){
++            if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("Connection.send: packet");
+             recorder.onPacket(packet);
++        }else{
++            if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("Connection.send: recorder null");
+         }
+         //Serversiderecorder end
+     }
+@@ -836,11 +844,16 @@ public class Connection extends SimpleChannelInboundHandler<Packet<?>> implement
+ 
+     public void handleDisconnection() {
+ 
+-
+         if (this.channel != null && !this.channel.isOpen()) {
+             if (this.disconnectionHandled) {
+                 //Connection.LOGGER.warn("handleDisconnection() called twice"); // Paper - Do not log useless message
+             } else {
++                //ServersideRecorder start
++                if(this.getRecorder() != null){
++                    if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("Connection.handleDisconnection: disconnected");
++                    this.getRecorder().handleDisconnect();
++                }
++                //ServersideRecorder end
+                 this.disconnectionHandled = true;
+                 if (this.getDisconnectedReason() != null) {
+                     this.getPacketListener().onDisconnect(this.getDisconnectedReason());
+@@ -868,6 +881,8 @@ public class Connection extends SimpleChannelInboundHandler<Packet<?>> implement
+                     }
+                 }
+                 // Paper end
++
++
+             }
+ 
+         }
+diff --git a/src/main/java/net/minecraft/server/MinecraftServer.java b/src/main/java/net/minecraft/server/MinecraftServer.java
+index 3ea2f0265c13a66231706f12763687e816b5c650..f8da7ad69f2dc1eb6b2bd9cc0dbd6099177a0d6b 100644
+--- a/src/main/java/net/minecraft/server/MinecraftServer.java
++++ b/src/main/java/net/minecraft/server/MinecraftServer.java
+@@ -915,6 +915,7 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
+     public void stopServer() {
+         // ServerSideRecorder start
+         for (ReplayRecorder recorder : ReplayRecorder.active_recorders){
++            if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("stopServer: handleDisconnect");
+             recorder.handleDisconnect();
+         }
+         // ServerSideRecorder End
+@@ -1114,6 +1115,7 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
+             if (!this.initServer()) {
+                 throw new IllegalStateException("Failed to initialize server");
+             }
++            if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("runServer: onInitialize");
+             ServerSideReplayRecorderServer.onInitialize();
+             ServerSideReplayRecorderServer.registerServer((MinecraftServer)(Object)this); //ServerSideRecord
+ 
+diff --git a/src/main/java/net/minecraft/server/level/ChunkHolder.java b/src/main/java/net/minecraft/server/level/ChunkHolder.java
+index 16360c249ca5e36cae457634d1eb495810632af7..353441e5509bf5c0bcf48bda3c80eb7bd9d6da4e 100644
+--- a/src/main/java/net/minecraft/server/level/ChunkHolder.java
++++ b/src/main/java/net/minecraft/server/level/ChunkHolder.java
+@@ -19,6 +19,7 @@ import net.minecraft.network.protocol.Packet;
+ import net.minecraft.network.protocol.game.ClientboundBlockUpdatePacket;
+ import net.minecraft.network.protocol.game.ClientboundLightUpdatePacket;
+ import net.minecraft.network.protocol.game.ClientboundSectionBlocksUpdatePacket;
++import net.minecraft.serversidereplayrecorder.ServerSideReplayRecorderServer;
+ import net.minecraft.serversidereplayrecorder.recorder.RegionRecorder;
+ import net.minecraft.serversidereplayrecorder.util.interfaces.RegionRecorderWorld;
+ import net.minecraft.util.DebugBuffer;
+@@ -399,9 +400,15 @@ public class ChunkHolder {
+ 
+     private void broadcast(List<ServerPlayer> players, Packet<?> packet) {
+         // Serversiderecorder start
++        if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("ChunkHolder.broadcast: ");
+         Set<RegionRecorder> recorders = ((RegionRecorderWorld)this.levelHeightAccessor).getRegionRecordersByChunk().get(this.pos);
+-        if (recorders != null)
++        if (recorders != null){
++            if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("ChunkHolder.broadcast: packet");
+             recorders.forEach( r -> r.onPacket(packet));
++        }else{
++            if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("ChunkHolder.broadcast: null");
++        }
++
+         // Serversiderecorder end
+ 
+         players.forEach((entityplayer) -> {
+diff --git a/src/main/java/net/minecraft/server/level/ChunkMap.java b/src/main/java/net/minecraft/server/level/ChunkMap.java
+index 024b9474ee5cbd887c2604d344138cb4c244c2f1..f9ee9cb2af7a177b6372ac404a950c8a0f8ccd7d 100644
+--- a/src/main/java/net/minecraft/server/level/ChunkMap.java
++++ b/src/main/java/net/minecraft/server/level/ChunkMap.java
+@@ -57,8 +57,10 @@ import net.minecraft.nbt.CompoundTag;
+ import net.minecraft.network.protocol.Packet;
+ import net.minecraft.network.protocol.game.*;
+ import io.papermc.paper.util.MCUtil;
++import net.minecraft.server.MinecraftServer;
+ import net.minecraft.server.level.progress.ChunkProgressListener;
+ import net.minecraft.server.network.ServerPlayerConnection;
++import net.minecraft.serversidereplayrecorder.ServerSideReplayRecorderServer;
+ import net.minecraft.serversidereplayrecorder.recorder.PlayerRecorder;
+ import net.minecraft.serversidereplayrecorder.recorder.RegionRecorder;
+ import net.minecraft.serversidereplayrecorder.recorder.ReplayRecorder;
+@@ -791,11 +793,12 @@ public class ChunkMap extends ChunkStorage implements ChunkHolder.PlayerProvider
+     // Paper end
+     public CompletableFuture<Either<LevelChunk, ChunkHolder.ChunkLoadingFailure>> prepareTickingChunk(ChunkHolder holder) {
+         //CompletableFuture<Either<LevelChunk, ChunkHolder.ChunkLoadingFailure>> completableFuture2 = holder;
+-
++        if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("ChunkMap.CompletableFuture: ");
+        // completableFuture2.thenApplyAsync(either -> either.ifLeft(worldChunk -> {
+             Set<RegionRecorder> recorders = ((RegionRecorderWorld)this.level).getRegionRecordersByExpandedChunk().get(holder.getPos()); //Serversiderecorder
+             if (recorders != null)
+                 recorders.forEach( r -> {
++                    if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("ChunkMap.CompletableFuture: onPacket");
+                     r.onPacket(new ClientboundLevelChunkWithLightPacket(holder.getFullChunk(), this.getLightEngine(), null, null));
+                 });
+        // }));
+@@ -1134,6 +1137,7 @@ public class ChunkMap extends ChunkStorage implements ChunkHolder.PlayerProvider
+ 
+     public void move(ServerPlayer player) {
+         // Paper - delay this logic for the entity tracker tick, no need to duplicate it
++        if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("ChunkMap.move: ");
+         ((RegionRecorderEntityTracker)this.entityMap.get(player.getId())).updateTrackedStatus(((RegionRecorderWorld)this.level).getRegionRecorders()); //Serversiderecorder
+ 
+         int i = SectionPos.blockToSectionCoord(player.getBlockX());
+@@ -1456,6 +1460,7 @@ public class ChunkMap extends ChunkStorage implements ChunkHolder.PlayerProvider
+ 
+         @Override
+         public ReplayRecorder getRecorder() {
++            if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("ChunkMap.getRecorder: ");
+             return this.recorder.get();
+         }
+ 
+@@ -1464,9 +1469,12 @@ public class ChunkMap extends ChunkStorage implements ChunkHolder.PlayerProvider
+             this.recorder = new WeakReference<>(recorder);
+             //send the spawn packets when the tracker is creaed
+             //works also for dimension change as a new tracker is created while changing dimension
+-
++            if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("ChunkMap.setRecorder: ");
+             if (recorder != null) {
++                if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("ChunkMap.onPacket: ");
+                 serverEntity.sendPairingData(null, recorder::onPacket);
++            }else{
++                if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("ChunkMap.onPacket: null");
+             }
+         }
+ 
+@@ -1474,24 +1482,32 @@ public class ChunkMap extends ChunkStorage implements ChunkHolder.PlayerProvider
+ 
+         public void updateTrackedStatus(RegionRecorder recorder){
+             boolean spectator = false;
++            if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("ChunkMap.updateTrackedStatus: ");
+             if ( entity instanceof ServerPlayer serverPlayerEntity )
+                 spectator = serverPlayerEntity.isSpectator();
+             if (recorder.isOpen() && recorder.region.isInBox(this.entity.position()) && !spectator){
++                if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("ChunkMap.updateTrackedStatus: recorder");
+                 if (this.listenening_recorders.add(recorder)) {
++                    if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("ChunkMap.updateTrackedStatus: addRecorder");
+                     this.startTracking(recorder);
++                }else{
++                    if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("ChunkMap.updateTrackedStatus: Did not add Recorder");
+                 }
+             }else{
+                 if(this.listenening_recorders.remove(recorder)){
++                    if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("ChunkMap.updateTrackedStatus: remove Recorder");
+                     this.stopTracking(recorder);
+                 }
+             }
+         }
+ 
+         void startTracking(RegionRecorder recorder){
++            if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("ChunkMap.startTracking: ");
+             this.serverEntity.sendPairingData(null, recorder::onPacket);
+         }
+ 
+         void stopTracking(RegionRecorder recorder){
++            if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("ChunkMap.stopTracking: ");
+             recorder.onPacket(new ClientboundRemoveEntitiesPacket(this.entity.getId()));
+         }
+         //Serversiderecorder end
+@@ -1502,8 +1518,10 @@ public class ChunkMap extends ChunkStorage implements ChunkHolder.PlayerProvider
+             this.range = i;
+             this.lastSectionPos = SectionPos.of((EntityAccess) entity);
+ 
++
+             //Serversiderecorder Start
+             if (entity instanceof ServerPlayer serverPlayer){
++                if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("ChunkMap.TrackedEntity: serverPlayer");
+                 this.setRecorder(PlayerRecorder.playerRecorderMap.get(serverPlayer.connection.connection));
+             }
+             //Serversiderecorder end
+diff --git a/src/main/java/net/minecraft/server/level/ServerLevel.java b/src/main/java/net/minecraft/server/level/ServerLevel.java
+index 9e6602565e95b0f614f126dcd860a9b4b5492940..92f3b7805a7d630470cd1916d925db3b2fb9c016 100644
+--- a/src/main/java/net/minecraft/server/level/ServerLevel.java
++++ b/src/main/java/net/minecraft/server/level/ServerLevel.java
+@@ -61,6 +61,7 @@ import net.minecraft.server.MinecraftServer;
+ import net.minecraft.server.ServerScoreboard;
+ import net.minecraft.server.level.progress.ChunkProgressListener;
+ import net.minecraft.server.players.SleepStatus;
++import net.minecraft.serversidereplayrecorder.ServerSideReplayRecorderServer;
+ import net.minecraft.serversidereplayrecorder.recorder.PlayerRecorder;
+ import net.minecraft.serversidereplayrecorder.recorder.RegionRecorder;
+ import net.minecraft.serversidereplayrecorder.util.interfaces.RegionRecorderWorld;
+@@ -1739,6 +1740,7 @@ public class ServerLevel extends Level implements WorldGenLevel, RegionRecorderW
+     @Override
+     public void destroyBlockProgress(int entityId, BlockPos pos, int progress) {
+         // ServerSideRecorder Start
++        if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("ServerLevel.destroyBlockProgress: ");
+         getRegionRecorders().stream().filter(r -> r.region.isInBox(new Vec3(pos.getX(),pos.getY(),pos.getZ()))).forEach(
+             r -> r.onPacket(new ClientboundBlockDestructionPacket(entityId, pos, progress))
+         );
+@@ -1927,6 +1929,7 @@ public class ServerLevel extends Level implements WorldGenLevel, RegionRecorderW
+         }
+ 
+         //ServerSideRecorder Start
++        if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("ServerList.explode: ");
+         getRegionRecorders().stream().filter(r -> r.region.isInBox(new Vec3(x,y,z))).forEach(
+             r -> r.onPacket(new ClientboundExplodePacket(x, y, z, power, explosion.getToBlow(), Vec3.ZERO))
+         );
+diff --git a/src/main/java/net/minecraft/server/players/PlayerList.java b/src/main/java/net/minecraft/server/players/PlayerList.java
+index 47a1d4a57e0be0f870f1040a9d8d463413198dfb..5ca1812dd3981b1890e89205fbed19d5c99d622f 100644
+--- a/src/main/java/net/minecraft/server/players/PlayerList.java
++++ b/src/main/java/net/minecraft/server/players/PlayerList.java
+@@ -171,22 +171,22 @@ public abstract class PlayerList {
+ 
+     public void placeNewPlayer(Connection connection, ServerPlayer player) {
+         //ServerSideReplayRecorder start
+-       // if (ServerSideReplayRecorderServer.config.isRecording_enabled() && !PlayerRecorder.playerRecorderMap.containsKey(connection)
+-       //     && ( ServerSideReplayRecorderServer.config.getRecordable_users().contains(player.getGameProfile().getName())) != ServerSideReplayRecorderServer.config.invert_user_list() ) {
+-            try {
++//        if (ServerSideReplayRecorderServer.config.isRecording_enabled() && !PlayerRecorder.playerRecorderMap.containsKey(connection)
++//            && ( ServerSideReplayRecorderServer.config.getRecordable_users().contains(player.getGameProfile().getName())) != ServerSideReplayRecorderServer.config.invert_user_list() ) {
++        if (!PlayerRecorder.playerRecorderMap.containsKey(connection)) {
++        if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("PlayerList.placeNewPlayer: ");
++        try {
+                 ServerSideReplayRecorderServer.LOGGER.info("Started Recording Player %s".formatted(player.getGameProfile().getName()));
+ 
+                 this.getPlayers().stream().filter(p -> this.isOp(p.getGameProfile())).forEach( p -> p.displayClientMessage(Component.literal("Started Recording Player %s".formatted(player.getGameProfile().getName())), false));
+-                //player.connection
++
+                 PlayerRecorder recorder = new PlayerRecorder(connection);
+                 PlayerRecorder.playerRecorderMap.put(connection, recorder);
+-//                PlayerRecorder recorder = new PlayerRecorder(connection);
+-//                PlayerRecorder.playerRecorderMap.put(connection, recorder);
+                 recorder.onPacket(new ClientboundGameProfilePacket(player.getGameProfile()));
+             } catch (IOException e) {
+                 e.printStackTrace();
+             }
+-       // }
++        }
+         //ServerSideReplayRecorder end
+ 
+         player.isRealPlayer = true; // Paper
+@@ -1007,6 +1007,7 @@ public abstract class PlayerList {
+     }
+ 
+     public void broadcastAll(Packet<?> packet) {
++        if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("PlayerList.broadcastAll: packet");
+         RegionRecorder.regionRecorderMap.values().forEach(r -> r.onPacket(packet)); //Serversiderecorder
+ 
+         Iterator iterator = this.players.iterator();
+@@ -1039,6 +1040,7 @@ public abstract class PlayerList {
+     // CraftBukkit end
+ 
+     public void broadcastAll(Packet<?> packet, ResourceKey<Level> dimension) {
++        if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("PlayerList.broadcastAll: packet,dimension");
+         RegionRecorder.regionRecorderMap.values().stream().filter(r -> r.world.registryAccess().equals(dimension)).forEach(r -> r.onPacket(packet)); //Serversiderecorder
+ 
+         Iterator iterator = this.players.iterator();
+@@ -1194,9 +1196,13 @@ public abstract class PlayerList {
+         //Serversiderecorder start
+ 
+         if (player != null) {
++            if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("PlayerList.broadcast: player");
+             ReplayRecorder recorder = ((RecorderHolder)(((ServerPlayer) player).connection.connection)).getRecorder();
+             if (recorder != null) {
++                if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("PlayerList.broadcast: recorder");
+                 recorder.onPacket(packet);
++            }else{
++                if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("PlayerList.broadcast: recorder null");
+             }
+         }
+ 
+diff --git a/src/main/java/net/minecraft/serversidereplayrecorder/ServerSideReplayRecorderServer.java b/src/main/java/net/minecraft/serversidereplayrecorder/ServerSideReplayRecorderServer.java
+index 723aca57bbe71764774ff8991de6e3c6b134c323..a0cf4c044850fcfc7dcc33182716893466184b29 100644
+--- a/src/main/java/net/minecraft/serversidereplayrecorder/ServerSideReplayRecorderServer.java
++++ b/src/main/java/net/minecraft/serversidereplayrecorder/ServerSideReplayRecorderServer.java
+@@ -23,16 +23,16 @@ public class ServerSideReplayRecorderServer {
+         builder.disable(YAMLGenerator.Feature.WRITE_DOC_START_MARKER);
+         builder.enable(YAMLGenerator.Feature.INDENT_ARRAYS_WITH_INDICATOR);
+         yaml = new ObjectMapper(builder.build()).configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+-        placeholders = ResourceBundle.getBundle("placeholders");
+-        upload_sites = ResourceBundle.getBundle("upload_sites");
++       // placeholders = ResourceBundle.getBundle("placeholders");
++        //upload_sites = ResourceBundle.getBundle("upload_sites");
+     }
+ 
+     public static final ExecutorService recorderExecutor = Executors.newSingleThreadExecutor(new DefaultThreadFactory("Replay",true));
+ 
+     private static final ObjectMapper yaml;
+ 
+-    public static final ResourceBundle placeholders;
+-    public static final ResourceBundle upload_sites;
++    //public static final ResourceBundle placeholders;
++    //public static final ResourceBundle upload_sites;
+ 
+     public static final Logger LOGGER = LoggerFactory.getLogger(ServerSideReplayRecorderServer.class.getName());
+ 
+@@ -42,10 +42,11 @@ public class ServerSideReplayRecorderServer {
+     public static MainConfig config = new MainConfig();
+ 
+     public static void loadConfig() {
++        if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("loadConfig: loading...");
+         try {
+             yaml.findAndRegisterModules();
+             config = yaml.readValue(new FileReader(configPath), MainConfig.class);
+-
++            if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("loadConfig: loaded");
+         }catch (FileNotFoundException e){
+             System.out.println("Config file not found, creating with default values...");
+             saveConfig();
+diff --git a/src/main/java/net/minecraft/serversidereplayrecorder/recorder/ReplayRecorder.java b/src/main/java/net/minecraft/serversidereplayrecorder/recorder/ReplayRecorder.java
+index d6f1308bc76895094dc07f71ba00b1ace427d494..324e2b9fe2e4141cac1ec0a1d2ef8fe9710f94e6 100644
+--- a/src/main/java/net/minecraft/serversidereplayrecorder/recorder/ReplayRecorder.java
++++ b/src/main/java/net/minecraft/serversidereplayrecorder/recorder/ReplayRecorder.java
+@@ -329,10 +329,13 @@ public abstract class ReplayRecorder {
+     protected final AtomicReference<Queue<Packet<?>>> packetQueue = new AtomicReference<>(new ConcurrentLinkedQueue<>());
+ 
+     protected void save(Packet<?> packet) {
++        if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("ReplayRecorder.save: ");
+         if (ServerSideReplayRecorderServer.config.use_server_timestamps()) {
++            if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("ReplayRecorder.save: use_server_timestamps");
+             //queue the packets and wait for the server to complete a tick before saving them
+             packetQueue.get().add(packet);
+         }else{
++            if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("ReplayRecorder.save: else");
+             //use a separate thread to write to file ( to not hang up the server )
+             int timestamp =(int) (System.currentTimeMillis() - start.get());
+             this.fileWriterExecutor.execute(() -> this._save(packet, timestamp));

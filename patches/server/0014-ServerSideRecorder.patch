@@ -1,0 +1,21 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Bryan1029384756 <23323626+Bryan1029384756@users.noreply.github.com>
+Date: Sun, 18 Jun 2023 21:33:07 -0500
+Subject: [PATCH] ServerSideRecorder
+
+
+diff --git a/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java b/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java
+index 706fa43dc3534c0ca10bc96dc33bbfb9736b3c95..bdde12d6b92e0f5c132f283062819d52efd2b3b7 100644
+--- a/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java
++++ b/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java
+@@ -486,8 +486,9 @@ public class ServerGamePacketListenerImpl implements ServerPlayerConnection, Tic
+ 
+     public void disconnect(net.kyori.adventure.text.Component reason, org.bukkit.event.player.PlayerKickEvent.Cause cause) {
+         //ServersideRecorder start
++        if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("ServerGamePacketListenerImpl.disconnect: disconnected");
+         if(this.connection.getRecorder() != null){
+-            if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("Connection.handleDisconnection: disconnected");
++            if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("ServerGamePacketListenerImpl.disconnect: getRecorder");
+             this.connection.getRecorder().handleDisconnect();
+         }
+         //ServersideRecorder end

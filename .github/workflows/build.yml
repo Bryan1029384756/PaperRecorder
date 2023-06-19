@@ -27,7 +27,7 @@ jobs:
       - name: Apply Patches
         run: ./gradlew applyPatches
       - name: Build Bundler & Paperclip
-          run: ./gradlew createReobfBundlerJar
+        run: ./gradlew createReobfBundlerJar
       - name: Publish Snapshots
           env:
             GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

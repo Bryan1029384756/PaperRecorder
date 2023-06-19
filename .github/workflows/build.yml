@@ -29,9 +29,9 @@ jobs:
       - name: Build Bundler & Paperclip
           run: ./gradlew createReobfBundlerJar
       - name: Publish Snapshots
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: ./gradlew publish
+          env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          run: ./gradlew publish
             - name: capture build artifacts
               uses: actions/upload-artifact@v2
               with:

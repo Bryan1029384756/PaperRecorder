@@ -15,10 +15,10 @@ if (!file(".git").exists()) {
     val errorText = """
         
         =====================[ ERROR ]=====================
-         The Folia project directory is not a properly cloned Git repository.
+         The PaperRecord project directory is not a properly cloned Git repository.
          
-         In order to build Folia from source you must clone
-         the Folia repository using Git, not download a code
+         In order to build PaperRecord from source you must clone
+         the PaperRecord repository using Git, not download a code
          zip from GitHub.
          
          See https://github.com/PaperMC/Paper/blob/master/CONTRIBUTING.md
@@ -28,9 +28,9 @@ if (!file(".git").exists()) {
     error(errorText)
 }
 
-rootProject.name = "folia"
+rootProject.name = "paperrecord"
 
-for (name in listOf("Folia-API", "Folia-Server")) {
+for (name in listOf("PaperRecord-API", "PaperRecord-Server")) {
     val projName = name.lowercase(Locale.ENGLISH)
     include(projName)
     findProject(":$projName")!!.projectDir = file(name)

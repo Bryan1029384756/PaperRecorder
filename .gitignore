@@ -48,5 +48,7 @@ run/
 
 Folia-Server
 Folia-API
+PaperRecord-Server
+PaperRecord-API
 
 !gradle/wrapper/gradle-wrapper.jar

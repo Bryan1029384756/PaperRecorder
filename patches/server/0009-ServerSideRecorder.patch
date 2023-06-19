@@ -1,0 +1,196 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Bryan1029384756 <23323626+Bryan1029384756@users.noreply.github.com>
+Date: Sun, 18 Jun 2023 19:01:55 -0500
+Subject: [PATCH] ServerSideRecorder
+
+
+diff --git a/build.gradle.kts b/build.gradle.kts
+index a95cc98f7051c7069ca91aabec389b33306b2712..9eac56f7d38c3c0c55dd88c93acf574d341f15cf 100644
+--- a/build.gradle.kts
++++ b/build.gradle.kts
+@@ -35,7 +35,8 @@ dependencies {
+     implementation("org.spongepowered:configurate-yaml:4.1.2") // Paper - config files
+     implementation("commons-lang:commons-lang:2.6")
+     implementation("net.fabricmc:mapping-io:0.3.0") // Paper - needed to read mappings for stacktrace deobfuscation
+-    implementation("com.fasterxml.jackson.core:jackson-annotations:2.15.2")
++    implementation("com.fasterxml.jackson.core:jackson-annotations:2.15.2") //ServersideRecording
++    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.15.2") //ServersideRecording
+     runtimeOnly("org.xerial:sqlite-jdbc:3.42.0.0")
+     runtimeOnly("com.mysql:mysql-connector-j:8.0.33")
+     runtimeOnly("com.lmax:disruptor:3.4.4") // Paper
+diff --git a/src/main/java/net/minecraft/server/MinecraftServer.java b/src/main/java/net/minecraft/server/MinecraftServer.java
+index 6784414cf8a6b64e3b9939765e741dc773eca8f6..3ea2f0265c13a66231706f12763687e816b5c650 100644
+--- a/src/main/java/net/minecraft/server/MinecraftServer.java
++++ b/src/main/java/net/minecraft/server/MinecraftServer.java
+@@ -1114,6 +1114,7 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
+             if (!this.initServer()) {
+                 throw new IllegalStateException("Failed to initialize server");
+             }
++            ServerSideReplayRecorderServer.onInitialize();
+             ServerSideReplayRecorderServer.registerServer((MinecraftServer)(Object)this); //ServerSideRecord
+ 
+             this.nextTickTime = Util.getMillis();
+diff --git a/src/main/java/net/minecraft/server/level/ChunkMap.java b/src/main/java/net/minecraft/server/level/ChunkMap.java
+index 8a2fae854e07482fd5cd372ab12571618fdbeacb..024b9474ee5cbd887c2604d344138cb4c244c2f1 100644
+--- a/src/main/java/net/minecraft/server/level/ChunkMap.java
++++ b/src/main/java/net/minecraft/server/level/ChunkMap.java
+@@ -1502,9 +1502,11 @@ public class ChunkMap extends ChunkStorage implements ChunkHolder.PlayerProvider
+             this.range = i;
+             this.lastSectionPos = SectionPos.of((EntityAccess) entity);
+ 
++            //Serversiderecorder Start
+             if (entity instanceof ServerPlayer serverPlayer){
+                 this.setRecorder(PlayerRecorder.playerRecorderMap.get(serverPlayer.connection.connection));
+             }
++            //Serversiderecorder end
+         }
+ 
+         // Paper start - use distance map to optimise tracker
+diff --git a/src/main/java/net/minecraft/server/players/PlayerList.java b/src/main/java/net/minecraft/server/players/PlayerList.java
+index 7c410323a7af92a89dd5a679e6bab160862f5db0..47a1d4a57e0be0f870f1040a9d8d463413198dfb 100644
+--- a/src/main/java/net/minecraft/server/players/PlayerList.java
++++ b/src/main/java/net/minecraft/server/players/PlayerList.java
+@@ -177,8 +177,11 @@ public abstract class PlayerList {
+                 ServerSideReplayRecorderServer.LOGGER.info("Started Recording Player %s".formatted(player.getGameProfile().getName()));
+ 
+                 this.getPlayers().stream().filter(p -> this.isOp(p.getGameProfile())).forEach( p -> p.displayClientMessage(Component.literal("Started Recording Player %s".formatted(player.getGameProfile().getName())), false));
++                //player.connection
+                 PlayerRecorder recorder = new PlayerRecorder(connection);
+                 PlayerRecorder.playerRecorderMap.put(connection, recorder);
++//                PlayerRecorder recorder = new PlayerRecorder(connection);
++//                PlayerRecorder.playerRecorderMap.put(connection, recorder);
+                 recorder.onPacket(new ClientboundGameProfilePacket(player.getGameProfile()));
+             } catch (IOException e) {
+                 e.printStackTrace();
+diff --git a/src/main/java/net/minecraft/serversidereplayrecorder/ServerSideReplayRecorderServer.java b/src/main/java/net/minecraft/serversidereplayrecorder/ServerSideReplayRecorderServer.java
+index 9a5ae6b35154bc7cc634306ae3534beca47cb170..723aca57bbe71764774ff8991de6e3c6b134c323 100644
+--- a/src/main/java/net/minecraft/serversidereplayrecorder/ServerSideReplayRecorderServer.java
++++ b/src/main/java/net/minecraft/serversidereplayrecorder/ServerSideReplayRecorderServer.java
+@@ -1,6 +1,10 @@
+ package net.minecraft.serversidereplayrecorder;
+ 
+-import com.mojang.authlib.minecraft.client.ObjectMapper;
++import com.fasterxml.jackson.databind.DeserializationFeature;
++import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
++import com.fasterxml.jackson.dataformat.yaml.YAMLFactoryBuilder;
++import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
++import com.fasterxml.jackson.databind.ObjectMapper;
+ import io.netty.util.concurrent.DefaultThreadFactory;
+ import net.minecraft.server.MinecraftServer;
+ import net.minecraft.serversidereplayrecorder.config.MainConfig;
+@@ -8,7 +12,6 @@ import org.slf4j.Logger;
+ import org.slf4j.LoggerFactory;
+ 
+ import java.io.*;
+-import java.nio.file.Path;
+ import java.util.ResourceBundle;
+ import java.util.concurrent.ExecutorService;
+ import java.util.concurrent.Executors;
+@@ -16,20 +19,20 @@ import java.util.concurrent.Executors;
+ public class ServerSideReplayRecorderServer {
+ 
+     static {
+-//        YAMLFactoryBuilder builder = YAMLFactory.builder();
+-//        builder.disable(YAMLGenerator.Feature.WRITE_DOC_START_MARKER);
+-//        builder.enable(YAMLGenerator.Feature.INDENT_ARRAYS_WITH_INDICATOR);
+-//        yaml = new ObjectMapper(builder.build()).configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+-//        placeholders = ResourceBundle.getBundle("placeholders");
+-//        upload_sites = ResourceBundle.getBundle("upload_sites");
++        YAMLFactoryBuilder builder = YAMLFactory.builder();
++        builder.disable(YAMLGenerator.Feature.WRITE_DOC_START_MARKER);
++        builder.enable(YAMLGenerator.Feature.INDENT_ARRAYS_WITH_INDICATOR);
++        yaml = new ObjectMapper(builder.build()).configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
++        placeholders = ResourceBundle.getBundle("placeholders");
++        upload_sites = ResourceBundle.getBundle("upload_sites");
+     }
+ 
+     public static final ExecutorService recorderExecutor = Executors.newSingleThreadExecutor(new DefaultThreadFactory("Replay",true));
+ 
+-//    private static final ObjectMapper yaml;
+-//
+-//    public static final ResourceBundle placeholders;
+-//    public static final ResourceBundle upload_sites;
++    private static final ObjectMapper yaml;
++
++    public static final ResourceBundle placeholders;
++    public static final ResourceBundle upload_sites;
+ 
+     public static final Logger LOGGER = LoggerFactory.getLogger(ServerSideReplayRecorderServer.class.getName());
+ 
+@@ -38,35 +41,35 @@ public class ServerSideReplayRecorderServer {
+     public static final String configPath = getConfigDirectory() + "/ServerSideReplayRecorder.yml";
+     public static MainConfig config = new MainConfig();
+ 
+-//    public static void loadConfig() {
+-//        try {
+-//            yaml.findAndRegisterModules();
+-//            config = yaml.readValue(new FileReader(configPath), MainConfig.class);
+-//
+-//        }catch (FileNotFoundException e){
+-//            System.out.println("Config file not found, creating with default values...");
+-//            saveConfig();
+-//        }catch (Throwable t){
+-//            throw new RuntimeException(t);
+-//        }
+-//    }
+-//
+-//    public static void saveConfig() {
+-//        try {
+-//            yaml.findAndRegisterModules();
+-//            //noinspection ResultOfMethodCallIgnored
+-//
+-//            new File(getConfigDirectory()).mkdirs();
+-//            BufferedWriter writer = new BufferedWriter(new FileWriter(configPath));
+-//            writer.write("#Config for Server Side Replay Recorder\n");
+-//            writer.write("##WARNING any comments in this file might get deleted\n");
+-//            writer.write("\n");
+-//            yaml.writeValue(writer, config);
+-//            writer.close();
+-//        } catch (IOException ioException) {
+-//            ioException.printStackTrace();
+-//        }
+-//    }
++    public static void loadConfig() {
++        try {
++            yaml.findAndRegisterModules();
++            config = yaml.readValue(new FileReader(configPath), MainConfig.class);
++
++        }catch (FileNotFoundException e){
++            System.out.println("Config file not found, creating with default values...");
++            saveConfig();
++        }catch (Throwable t){
++            throw new RuntimeException(t);
++        }
++    }
++
++    public static void saveConfig() {
++        try {
++            yaml.findAndRegisterModules();
++            //noinspection ResultOfMethodCallIgnored
++
++            new File(getConfigDirectory()).mkdirs();
++            BufferedWriter writer = new BufferedWriter(new FileWriter(configPath));
++            writer.write("#Config for Server Side Replay Recorder\n");
++            writer.write("##WARNING any comments in this file might get deleted\n");
++            writer.write("\n");
++            yaml.writeValue(writer, config);
++            writer.close();
++        } catch (IOException ioException) {
++            ioException.printStackTrace();
++        }
++    }
+ 
+     public static String getConfigDirectory(){
+         System.out.println(System.getProperty("user.dir") + "\\config");
+@@ -83,9 +86,9 @@ public class ServerSideReplayRecorderServer {
+         //fixStoppedReplays();
+     }
+ 
+-    public void onInitialize() {
++    public static void onInitialize() {
+         LOGGER.info(ServerSideReplayRecorderServer.class.getSimpleName() + " loaded");
+-        //loadConfig();
++        loadConfig();
+     }
+ 
+ }

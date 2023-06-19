@@ -1,0 +1,203 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Bryan1029384756 <23323626+Bryan1029384756@users.noreply.github.com>
+Date: Sun, 18 Jun 2023 21:54:16 -0500
+Subject: [PATCH] ServerSideRecorder
+
+
+diff --git a/src/main/java/net/minecraft/network/Connection.java b/src/main/java/net/minecraft/network/Connection.java
+index 207c4f65d20c5985c2e109b6e096a87f57eced81..4ad51b60ec083ffb1d66f323390d45dcb8d599ca 100644
+--- a/src/main/java/net/minecraft/network/Connection.java
++++ b/src/main/java/net/minecraft/network/Connection.java
+@@ -54,7 +54,7 @@ import org.slf4j.Logger;
+ import org.slf4j.Marker;
+ import org.slf4j.MarkerFactory;
+ 
+-public class Connection extends SimpleChannelInboundHandler<Packet<?>> implements RecorderHolder {
++public class Connection extends SimpleChannelInboundHandler<Packet<?>>  {
+ 
+     private static final float AVERAGE_PACKETS_SMOOTHING = 0.75F;
+     private static final Logger LOGGER = LogUtils.getLogger();
+@@ -86,23 +86,6 @@ public class Connection extends SimpleChannelInboundHandler<Packet<?>> implement
+ 
+ 
+ 
+-    //Serversiderecorder start
+-    WeakReference<ReplayRecorder> recorder = new WeakReference<>(null);
+-
+-    @Override
+-    public void setRecorder(ReplayRecorder recorder){
+-        if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("Connection.setRecorder: ");
+-        this.recorder = new WeakReference<>(recorder);
+-    }
+-
+-    @Override
+-    public ReplayRecorder getRecorder() {
+-        if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("Connection.getRecorder: ");
+-        return this.recorder.get();
+-    }
+-    //Serversiderecorder end
+-
+-
+ 
+     // Spigot Start
+     public java.util.UUID spoofedUUID;
+@@ -435,17 +418,6 @@ public class Connection extends SimpleChannelInboundHandler<Packet<?>> implement
+         }
+         this.flushQueue();
+         // Paper end
+-
+-        //Serversiderecorder start
+-        if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("Connection.send: ");
+-        ReplayRecorder recorder = this.recorder.get();
+-        if (recorder != null){
+-            if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("Connection.send: packet");
+-            recorder.onPacket(packet);
+-        }else{
+-            if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("Connection.send: recorder null");
+-        }
+-        //Serversiderecorder end
+     }
+ 
+     private void sendPacket(Packet<?> packet, @Nullable PacketSendListener callbacks) {
+diff --git a/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java b/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java
+index e4ebc83cf1543c301b440567f08d962b729354e3..ed728b30e91a6fe334dd53330a98225e3459d113 100644
+--- a/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java
++++ b/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java
+@@ -9,6 +9,8 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectMap.Entry;
+ import it.unimi.dsi.fastutil.ints.Int2ObjectMaps;
+ import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
+ import it.unimi.dsi.fastutil.objects.ObjectIterator;
++
++import java.lang.ref.WeakReference;
+ import java.net.SocketAddress;
+ import java.time.Duration;
+ import java.time.Instant;
+@@ -136,6 +138,9 @@ import net.minecraft.server.MinecraftServer;
+ import net.minecraft.server.level.ServerLevel;
+ import net.minecraft.server.level.ServerPlayer;
+ import net.minecraft.serversidereplayrecorder.ServerSideReplayRecorderServer;
++import net.minecraft.serversidereplayrecorder.recorder.PlayerRecorder;
++import net.minecraft.serversidereplayrecorder.recorder.ReplayRecorder;
++import net.minecraft.serversidereplayrecorder.util.interfaces.RecorderHolder;
+ import net.minecraft.stats.ServerRecipeBook;
+ import net.minecraft.util.FutureChain;
+ import net.minecraft.util.Mth;
+@@ -248,7 +253,7 @@ import org.bukkit.inventory.InventoryView;
+ import org.bukkit.inventory.SmithingInventory;
+ // CraftBukkit end
+ 
+-public class ServerGamePacketListenerImpl implements ServerPlayerConnection, TickablePacketListener, ServerGamePacketListener {
++public class ServerGamePacketListenerImpl implements ServerPlayerConnection, TickablePacketListener, ServerGamePacketListener,RecorderHolder {
+ 
+     static final Logger LOGGER = LogUtils.getLogger();
+     private static final int LATENCY_CHECK_INTERVAL = 15000;
+@@ -322,8 +327,33 @@ public class ServerGamePacketListenerImpl implements ServerPlayerConnection, Tic
+         this.chatMessageChain = new FutureChain(server.chatExecutor); // CraftBukkit - async chat
+         // CraftBukkit start - add fields and methods
+         this.cserver = server.server;
++
++        //Serversiderecorder start
++        ReplayRecorder recorder = PlayerRecorder.playerRecorderMap.get(connection);
++        if (recorder != null){
++            this.setRecorder(recorder);
++        }
++        //Serversiderecorder end
++    }
++
++
++
++    //Serversiderecorder start
++    WeakReference<ReplayRecorder> recorder = new WeakReference<>(null);
++
++    @Override
++    public void setRecorder(ReplayRecorder recorder){
++        if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("Connection.setRecorder: ");
++        this.recorder = new WeakReference<>(recorder);
+     }
+ 
++    @Override
++    public ReplayRecorder getRecorder() {
++        if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("Connection.getRecorder: ");
++        return this.recorder.get();
++    }
++    //Serversiderecorder end
++
+     private final org.bukkit.craftbukkit.CraftServer cserver;
+     public boolean processedDisconnect;
+     private int lastTick = MinecraftServer.currentTick;
+@@ -2101,9 +2131,10 @@ public class ServerGamePacketListenerImpl implements ServerPlayerConnection, Tic
+     public void onDisconnect(Component reason) {
+         //ServersideRecorder start
+         if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("ServerGamePacketListenerImpl.disconnect: disconnected");
+-        if(this.connection.getRecorder() != null){
++
++        if(this.getRecorder() != null){
+             if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("ServerGamePacketListenerImpl.disconnect: getRecorder");
+-            this.connection.getRecorder().handleDisconnect();
++            this.getRecorder().handleDisconnect();
+         }else{
+             if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("ServerGamePacketListenerImpl.disconnect: getRecorder null");
+         }
+@@ -2112,6 +2143,12 @@ public class ServerGamePacketListenerImpl implements ServerPlayerConnection, Tic
+         this.onDisconnect(reason, null);
+     }
+     public void onDisconnect(Component reason, @Nullable net.kyori.adventure.text.Component quitMessage) {
++        //Serversiderecorder start
++        ReplayRecorder recorder = this.getRecorder();
++        if (recorder != null){
++            recorder.handleDisconnect();
++        }
++        //Serversiderecorder end
+         // Paper end
+         // CraftBukkit start - Rarely it would send a disconnect line twice
+         if (this.processedDisconnect) {
+@@ -2179,6 +2216,17 @@ public class ServerGamePacketListenerImpl implements ServerPlayerConnection, Tic
+             });
+             throw new ReportedException(crashreport);
+         }
++
++        //Serversiderecorder start
++        if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("Connection.send: ");
++        ReplayRecorder recorder = this.getRecorder();
++        if (recorder != null){
++            if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("Connection.send: packet");
++            recorder.onPacket(packet);
++        }else{
++            if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("Connection.send: recorder null");
++        }
++        //Serversiderecorder end
+     }
+ 
+     @Override
+diff --git a/src/main/java/net/minecraft/server/network/ServerHandshakePacketListenerImpl.java b/src/main/java/net/minecraft/server/network/ServerHandshakePacketListenerImpl.java
+index 592eed28a8a700b02040689bf215ed7320bc518e..16489f145ff2b8d1697bd1ac709951774912e641 100644
+--- a/src/main/java/net/minecraft/server/network/ServerHandshakePacketListenerImpl.java
++++ b/src/main/java/net/minecraft/server/network/ServerHandshakePacketListenerImpl.java
+@@ -38,13 +38,6 @@ public class ServerHandshakePacketListenerImpl implements ServerHandshakePacketL
+ 
+ 
+     public ServerHandshakePacketListenerImpl(MinecraftServer server, Connection connection) {
+-        //Serversiderecorder start
+-        ReplayRecorder recorder = PlayerRecorder.playerRecorderMap.get(connection);
+-        if (recorder != null){
+-            connection.setRecorder(recorder);
+-        }
+-        //Serversiderecorder end
+-
+         this.server = server;
+         this.connection = connection;
+     }
+@@ -183,12 +176,7 @@ public class ServerHandshakePacketListenerImpl implements ServerHandshakePacketL
+ 
+     @Override
+     public void onDisconnect(Component reason) {
+-        //Serversiderecorder start
+-        ReplayRecorder recorder = this.connection.getRecorder();
+-        if (recorder != null){
+-            recorder.handleDisconnect();
+-        }
+-        //Serversiderecorder end
++
+     }
+ 
+     @Override

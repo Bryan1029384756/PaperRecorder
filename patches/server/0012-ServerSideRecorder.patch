@@ -1,0 +1,18 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Bryan1029384756 <23323626+Bryan1029384756@users.noreply.github.com>
+Date: Sun, 18 Jun 2023 20:53:18 -0500
+Subject: [PATCH] ServerSideRecorder
+
+
+diff --git a/src/main/java/net/minecraft/serversidereplayrecorder/recorder/ReplayRecorder.java b/src/main/java/net/minecraft/serversidereplayrecorder/recorder/ReplayRecorder.java
+index 4c1e74dc5acb0519a15f7274f3e7983737292f09..0580cd5d9c7512b8e6d04c363ba6d48e28ee8535 100644
+--- a/src/main/java/net/minecraft/serversidereplayrecorder/recorder/ReplayRecorder.java
++++ b/src/main/java/net/minecraft/serversidereplayrecorder/recorder/ReplayRecorder.java
+@@ -271,6 +271,7 @@ public abstract class ReplayRecorder {
+                 Runnable endTask = () -> {
+                     try {
+                         try {
++
+                             bos.close();
+                             fos.close();
+                             if (debugFile != null) {

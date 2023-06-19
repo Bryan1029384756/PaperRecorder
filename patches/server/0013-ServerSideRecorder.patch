@@ -1,0 +1,50 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Bryan1029384756 <23323626+Bryan1029384756@users.noreply.github.com>
+Date: Sun, 18 Jun 2023 21:28:20 -0500
+Subject: [PATCH] ServerSideRecorder
+
+
+diff --git a/src/main/java/net/minecraft/network/Connection.java b/src/main/java/net/minecraft/network/Connection.java
+index 6938fa3763783c6e12d23b1c7c74f4ff6688de03..207c4f65d20c5985c2e109b6e096a87f57eced81 100644
+--- a/src/main/java/net/minecraft/network/Connection.java
++++ b/src/main/java/net/minecraft/network/Connection.java
+@@ -848,12 +848,7 @@ public class Connection extends SimpleChannelInboundHandler<Packet<?>> implement
+             if (this.disconnectionHandled) {
+                 //Connection.LOGGER.warn("handleDisconnection() called twice"); // Paper - Do not log useless message
+             } else {
+-                //ServersideRecorder start
+-                if(this.getRecorder() != null){
+-                    if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("Connection.handleDisconnection: disconnected");
+-                    this.getRecorder().handleDisconnect();
+-                }
+-                //ServersideRecorder end
++
+                 this.disconnectionHandled = true;
+                 if (this.getDisconnectedReason() != null) {
+                     this.getPacketListener().onDisconnect(this.getDisconnectedReason());
+diff --git a/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java b/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java
+index d9c2d06ae24dcf80a497e75f4c7f63d401b77f9b..706fa43dc3534c0ca10bc96dc33bbfb9736b3c95 100644
+--- a/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java
++++ b/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java
+@@ -135,6 +135,7 @@ import net.minecraft.resources.ResourceLocation;
+ import net.minecraft.server.MinecraftServer;
+ import net.minecraft.server.level.ServerLevel;
+ import net.minecraft.server.level.ServerPlayer;
++import net.minecraft.serversidereplayrecorder.ServerSideReplayRecorderServer;
+ import net.minecraft.stats.ServerRecipeBook;
+ import net.minecraft.util.FutureChain;
+ import net.minecraft.util.Mth;
+@@ -484,6 +485,13 @@ public class ServerGamePacketListenerImpl implements ServerPlayerConnection, Tic
+     }
+ 
+     public void disconnect(net.kyori.adventure.text.Component reason, org.bukkit.event.player.PlayerKickEvent.Cause cause) {
++        //ServersideRecorder start
++        if(this.connection.getRecorder() != null){
++            if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("Connection.handleDisconnection: disconnected");
++            this.connection.getRecorder().handleDisconnect();
++        }
++        //ServersideRecorder end
++
+         // Paper end
+         // CraftBukkit start - fire PlayerKickEvent
+         if (this.processedDisconnect) {

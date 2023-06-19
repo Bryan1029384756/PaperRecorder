@@ -5,10 +5,10 @@ Subject: [PATCH] ServerSideRecorder
 
 
 diff --git a/build.gradle.kts b/build.gradle.kts
-index 19186e436cd6a5f00f0b42ac11f8050ad2ef6713..f82873d4bae6bbcca7f12788c93dc3b715d93c13 100644
+index 215366d7cc3720805d2dfde0662372ecede8383c..a95cc98f7051c7069ca91aabec389b33306b2712 100644
 --- a/build.gradle.kts
 +++ b/build.gradle.kts
-@@ -31,6 +31,7 @@ dependencies {
+@@ -35,6 +35,7 @@ dependencies {
      implementation("org.spongepowered:configurate-yaml:4.1.2") // Paper - config files
      implementation("commons-lang:commons-lang:2.6")
      implementation("net.fabricmc:mapping-io:0.3.0") // Paper - needed to read mappings for stacktrace deobfuscation

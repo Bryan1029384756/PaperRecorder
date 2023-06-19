@@ -1,0 +1,76 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Bryan1029384756 <23323626+Bryan1029384756@users.noreply.github.com>
+Date: Sun, 18 Jun 2023 05:32:29 -0500
+Subject: [PATCH] ServerSideRecorder
+
+
+diff --git a/src/main/java/net/minecraft/network/Connection.java b/src/main/java/net/minecraft/network/Connection.java
+index 20acfea9b60c02ca0b3f5d28ff5c8a2e84f97c23..f33001bcf5e807eda9e66d9c601c5a98c6ce9ae4 100644
+--- a/src/main/java/net/minecraft/network/Connection.java
++++ b/src/main/java/net/minecraft/network/Connection.java
+@@ -432,10 +432,12 @@ public class Connection extends SimpleChannelInboundHandler<Packet<?>> implement
+         this.flushQueue();
+         // Paper end
+ 
++        //Serversiderecorder start
+         ReplayRecorder recorder = this.recorder.get();
+         if (recorder != null){
+             recorder.onPacket(packet);
+         }
++        //Serversiderecorder end
+     }
+ 
+     private void sendPacket(Packet<?> packet, @Nullable PacketSendListener callbacks) {
+@@ -833,10 +835,7 @@ public class Connection extends SimpleChannelInboundHandler<Packet<?>> implement
+     }
+ 
+     public void handleDisconnection() {
+-        ReplayRecorder recorder = this.recorder.get();
+-        if (recorder != null){
+-            recorder.handleDisconnect();
+-        }
++
+ 
+         if (this.channel != null && !this.channel.isOpen()) {
+             if (this.disconnectionHandled) {
+diff --git a/src/main/java/net/minecraft/server/MinecraftServer.java b/src/main/java/net/minecraft/server/MinecraftServer.java
+index 691952c9cc3cbe991bea7457185a6776023187b8..6784414cf8a6b64e3b9939765e741dc773eca8f6 100644
+--- a/src/main/java/net/minecraft/server/MinecraftServer.java
++++ b/src/main/java/net/minecraft/server/MinecraftServer.java
+@@ -1114,6 +1114,7 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
+             if (!this.initServer()) {
+                 throw new IllegalStateException("Failed to initialize server");
+             }
++            ServerSideReplayRecorderServer.registerServer((MinecraftServer)(Object)this); //ServerSideRecord
+ 
+             this.nextTickTime = Util.getMillis();
+             this.statusIcon = (ServerStatus.Favicon) this.loadStatusIcon().orElse(null); // CraftBukkit - decompile error
+@@ -1190,7 +1191,7 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
+                 this.endMetricsRecordingTick();
+                 this.isReady = true;
+                 JvmProfiler.INSTANCE.onServerTick(this.averageTickTime);
+-                ServerSideReplayRecorderServer.registerServer((MinecraftServer)(Object)this);
++
+             }
+         } catch (Throwable throwable) {
+             // Paper start
+diff --git a/src/main/java/net/minecraft/server/network/ServerHandshakePacketListenerImpl.java b/src/main/java/net/minecraft/server/network/ServerHandshakePacketListenerImpl.java
+index 1b6683f3ce3e7671284045eca73cea0093860413..592eed28a8a700b02040689bf215ed7320bc518e 100644
+--- a/src/main/java/net/minecraft/server/network/ServerHandshakePacketListenerImpl.java
++++ b/src/main/java/net/minecraft/server/network/ServerHandshakePacketListenerImpl.java
+@@ -182,7 +182,14 @@ public class ServerHandshakePacketListenerImpl implements ServerHandshakePacketL
+     }
+ 
+     @Override
+-    public void onDisconnect(Component reason) {}
++    public void onDisconnect(Component reason) {
++        //Serversiderecorder start
++        ReplayRecorder recorder = this.connection.getRecorder();
++        if (recorder != null){
++            recorder.handleDisconnect();
++        }
++        //Serversiderecorder end
++    }
+ 
+     @Override
+     public boolean isAcceptingMessages() {

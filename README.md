@@ -1,6 +1,11 @@
 ## Overview
-PaperRecorder is a Fork of paper allowing players to record players and replay it using the replay mod.
+PaperRecorder is a Fork of paper allowing players to record players and replay it using the replay mod. <br>
 Original Mod for ServerSideReplayRecorder https://github.com/thecolonel63/server-side-replay-recorder
+
+Current Version: 1.20.1
+
+Currently only Region Recording works. <br>
+To record a region do **/replay region < name > start < from > < to >**
 
 ## License
 The PATCHES-LICENSE file describes the license for api & server patches,

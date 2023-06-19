@@ -4,8 +4,10 @@ Original Mod for ServerSideReplayRecorder https://github.com/thecolonel63/server
 
 Current Version: 1.20.1
 
-Currently only Region Recording works. <br>
-To record a region do **/replay region < name > start < from > < to >**
+
+Commands **/replay**
+
+Config is in **/config/ServerSideReplayRecorder.yml**
 
 ## License
 The PATCHES-LICENSE file describes the license for api & server patches,

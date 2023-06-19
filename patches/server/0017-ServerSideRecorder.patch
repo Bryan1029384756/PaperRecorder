@@ -1,0 +1,70 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Bryan1029384756 <23323626+Bryan1029384756@users.noreply.github.com>
+Date: Sun, 18 Jun 2023 22:03:16 -0500
+Subject: [PATCH] ServerSideRecorder
+
+
+diff --git a/src/main/java/net/minecraft/network/Connection.java b/src/main/java/net/minecraft/network/Connection.java
+index 4ad51b60ec083ffb1d66f323390d45dcb8d599ca..48cf8fe77f60eeee46b0e0f56a5eef690a9266e5 100644
+--- a/src/main/java/net/minecraft/network/Connection.java
++++ b/src/main/java/net/minecraft/network/Connection.java
+@@ -44,9 +44,6 @@ import net.minecraft.network.protocol.game.ClientboundDisconnectPacket;
+ import net.minecraft.network.protocol.login.ClientboundLoginDisconnectPacket;
+ import net.minecraft.server.MinecraftServer;
+ import net.minecraft.server.RunningOnDifferentThreadException;
+-import net.minecraft.serversidereplayrecorder.ServerSideReplayRecorderServer;
+-import net.minecraft.serversidereplayrecorder.recorder.ReplayRecorder;
+-import net.minecraft.serversidereplayrecorder.util.interfaces.RecorderHolder;
+ import net.minecraft.util.LazyLoadedValue;
+ import net.minecraft.util.Mth;
+ import org.apache.commons.lang3.Validate;
+diff --git a/src/main/java/net/minecraft/server/network/ServerHandshakePacketListenerImpl.java b/src/main/java/net/minecraft/server/network/ServerHandshakePacketListenerImpl.java
+index 16489f145ff2b8d1697bd1ac709951774912e641..6b5a0ad2fd19361bc44f683d56656e8e7b9e7bc5 100644
+--- a/src/main/java/net/minecraft/server/network/ServerHandshakePacketListenerImpl.java
++++ b/src/main/java/net/minecraft/server/network/ServerHandshakePacketListenerImpl.java
+@@ -4,15 +4,11 @@ import net.minecraft.SharedConstants;
+ import net.minecraft.network.Connection;
+ import net.minecraft.network.ConnectionProtocol;
+ import net.minecraft.network.chat.Component;
+-import net.minecraft.network.chat.MutableComponent;
+ import net.minecraft.network.protocol.handshake.ClientIntentionPacket;
+ import net.minecraft.network.protocol.handshake.ServerHandshakePacketListener;
+ import net.minecraft.network.protocol.login.ClientboundLoginDisconnectPacket;
+ import net.minecraft.network.protocol.status.ServerStatus;
+ import net.minecraft.server.MinecraftServer;
+-import net.minecraft.serversidereplayrecorder.recorder.PlayerRecorder;
+-import net.minecraft.serversidereplayrecorder.recorder.ReplayRecorder;
+-import net.minecraft.serversidereplayrecorder.util.interfaces.RecorderHolder;
+ 
+ // CraftBukkit start
+ import java.lang.ref.WeakReference;
+diff --git a/src/main/java/net/minecraft/server/players/PlayerList.java b/src/main/java/net/minecraft/server/players/PlayerList.java
+index 5ca1812dd3981b1890e89205fbed19d5c99d622f..541a27beec10e3aef65be64dfa797a931d3650a1 100644
+--- a/src/main/java/net/minecraft/server/players/PlayerList.java
++++ b/src/main/java/net/minecraft/server/players/PlayerList.java
+@@ -1197,7 +1197,7 @@ public abstract class PlayerList {
+ 
+         if (player != null) {
+             if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("PlayerList.broadcast: player");
+-            ReplayRecorder recorder = ((RecorderHolder)(((ServerPlayer) player).connection.connection)).getRecorder();
++            ReplayRecorder recorder = ((RecorderHolder)(((ServerPlayer) player).connection)).getRecorder();
+             if (recorder != null) {
+                 if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("PlayerList.broadcast: recorder");
+                 recorder.onPacket(packet);
+diff --git a/src/main/java/net/minecraft/serversidereplayrecorder/ServerSideReplayRecorderServer.java b/src/main/java/net/minecraft/serversidereplayrecorder/ServerSideReplayRecorderServer.java
+index a0cf4c044850fcfc7dcc33182716893466184b29..ae3826202dd3d14bd833caa50bc4ae47c286bff2 100644
+--- a/src/main/java/net/minecraft/serversidereplayrecorder/ServerSideReplayRecorderServer.java
++++ b/src/main/java/net/minecraft/serversidereplayrecorder/ServerSideReplayRecorderServer.java
+@@ -73,12 +73,10 @@ public class ServerSideReplayRecorderServer {
+     }
+ 
+     public static String getConfigDirectory(){
+-        System.out.println(System.getProperty("user.dir") + "\\config");
+         return System.getProperty("user.dir") + "\\config";
+     }
+ 
+     public static String getDirectory(){
+-        System.out.println(System.getProperty("user.dir"));
+         return System.getProperty("user.dir");
+     }
+ 

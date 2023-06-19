@@ -5,7 +5,7 @@ Subject: [PATCH] ServerSideRecorder
 
 
 diff --git a/build.gradle.kts b/build.gradle.kts
-index a95cc98f7051c7069ca91aabec389b33306b2712..9eac56f7d38c3c0c55dd88c93acf574d341f15cf 100644
+index 4fa7dd3f6f0bb814f2f561d96b035f325a98d263..20215b51b6253a66d7f036bcd4c03d8415bd1b41 100644
 --- a/build.gradle.kts
 +++ b/build.gradle.kts
 @@ -35,7 +35,8 @@ dependencies {
@@ -19,7 +19,7 @@ index a95cc98f7051c7069ca91aabec389b33306b2712..9eac56f7d38c3c0c55dd88c93acf574d
      runtimeOnly("com.mysql:mysql-connector-j:8.0.33")
      runtimeOnly("com.lmax:disruptor:3.4.4") // Paper
 diff --git a/src/main/java/net/minecraft/server/MinecraftServer.java b/src/main/java/net/minecraft/server/MinecraftServer.java
-index 6784414cf8a6b64e3b9939765e741dc773eca8f6..3ea2f0265c13a66231706f12763687e816b5c650 100644
+index 38b5d52f1dc3c5e7d2a546bcd0799243a90ba9a2..60e7db0d4a5c053e94d22990aac3b9617f6df269 100644
 --- a/src/main/java/net/minecraft/server/MinecraftServer.java
 +++ b/src/main/java/net/minecraft/server/MinecraftServer.java
 @@ -1114,6 +1114,7 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa

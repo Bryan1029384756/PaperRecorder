@@ -1,0 +1,123 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Bryan1029384756 <23323626+Bryan1029384756@users.noreply.github.com>
+Date: Mon, 19 Jun 2023 18:29:18 -0500
+Subject: [PATCH] ServerSideRecorder
+
+
+diff --git a/src/main/java/net/minecraft/server/players/PlayerList.java b/src/main/java/net/minecraft/server/players/PlayerList.java
+index 541a27beec10e3aef65be64dfa797a931d3650a1..a8f3a89697e7f6930ae8a20155c192b4643c38b4 100644
+--- a/src/main/java/net/minecraft/server/players/PlayerList.java
++++ b/src/main/java/net/minecraft/server/players/PlayerList.java
+@@ -171,9 +171,9 @@ public abstract class PlayerList {
+ 
+     public void placeNewPlayer(Connection connection, ServerPlayer player) {
+         //ServerSideReplayRecorder start
+-//        if (ServerSideReplayRecorderServer.config.isRecording_enabled() && !PlayerRecorder.playerRecorderMap.containsKey(connection)
+-//            && ( ServerSideReplayRecorderServer.config.getRecordable_users().contains(player.getGameProfile().getName())) != ServerSideReplayRecorderServer.config.invert_user_list() ) {
+-        if (!PlayerRecorder.playerRecorderMap.containsKey(connection)) {
++        if (ServerSideReplayRecorderServer.config.isRecording_enabled() && !PlayerRecorder.playerRecorderMap.containsKey(connection)
++            && ( ServerSideReplayRecorderServer.config.getRecordable_users().contains(player.getGameProfile().getName())) != ServerSideReplayRecorderServer.config.invert_user_list() ) {
++      //  if (!PlayerRecorder.playerRecorderMap.containsKey(connection)) {
+         if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("PlayerList.placeNewPlayer: ");
+         try {
+                 ServerSideReplayRecorderServer.LOGGER.info("Started Recording Player %s".formatted(player.getGameProfile().getName()));
+diff --git a/src/main/java/net/minecraft/serversidereplayrecorder/ServerSideReplayRecorderServer.java b/src/main/java/net/minecraft/serversidereplayrecorder/ServerSideReplayRecorderServer.java
+index ae3826202dd3d14bd833caa50bc4ae47c286bff2..1d6673b4e81a4f322cfde4b22779a999c134cf56 100644
+--- a/src/main/java/net/minecraft/serversidereplayrecorder/ServerSideReplayRecorderServer.java
++++ b/src/main/java/net/minecraft/serversidereplayrecorder/ServerSideReplayRecorderServer.java
+@@ -23,16 +23,14 @@ public class ServerSideReplayRecorderServer {
+         builder.disable(YAMLGenerator.Feature.WRITE_DOC_START_MARKER);
+         builder.enable(YAMLGenerator.Feature.INDENT_ARRAYS_WITH_INDICATOR);
+         yaml = new ObjectMapper(builder.build()).configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+-       // placeholders = ResourceBundle.getBundle("placeholders");
+-        //upload_sites = ResourceBundle.getBundle("upload_sites");
++        upload_sites = ResourceBundle.getBundle("upload_sites");
+     }
+ 
+     public static final ExecutorService recorderExecutor = Executors.newSingleThreadExecutor(new DefaultThreadFactory("Replay",true));
+ 
+     private static final ObjectMapper yaml;
+ 
+-    //public static final ResourceBundle placeholders;
+-    //public static final ResourceBundle upload_sites;
++    public static final ResourceBundle upload_sites;
+ 
+     public static final Logger LOGGER = LoggerFactory.getLogger(ServerSideReplayRecorderServer.class.getName());
+ 
+diff --git a/src/main/java/net/minecraft/serversidereplayrecorder/config/MainConfig.java b/src/main/java/net/minecraft/serversidereplayrecorder/config/MainConfig.java
+index ebd564edbbf60f603e0cf642af99c2f8f5bf1601..8e2d0ec530e408e572d1f0af38f6206e1fa94af7 100644
+--- a/src/main/java/net/minecraft/serversidereplayrecorder/config/MainConfig.java
++++ b/src/main/java/net/minecraft/serversidereplayrecorder/config/MainConfig.java
+@@ -17,7 +17,7 @@ public class MainConfig {
+     private String server_name = "My Server";
+     private Set<String> recordable_users = new HashSet<>();
+     private boolean invert_user_list = false;
+-    private boolean recording_enabled = false;
++    private boolean recording_enabled = true;
+     private boolean use_server_timestamps = true;
+     private boolean assume_unloaded_chunks_dont_change = true;
+     private boolean render_distance_fog_fix = false;
+diff --git a/src/main/java/net/minecraft/serversidereplayrecorder/recorder/ReplayRecorder.java b/src/main/java/net/minecraft/serversidereplayrecorder/recorder/ReplayRecorder.java
+index 0580cd5d9c7512b8e6d04c363ba6d48e28ee8535..f0627468012f1725ff4493e559ad8636e122460e 100644
+--- a/src/main/java/net/minecraft/serversidereplayrecorder/recorder/ReplayRecorder.java
++++ b/src/main/java/net/minecraft/serversidereplayrecorder/recorder/ReplayRecorder.java
+@@ -125,7 +125,6 @@ public abstract class ReplayRecorder {
+                 object.addProperty("fileFormat", "MCPR");
+                 object.addProperty("fileFormatVersion", 14); //Unlikely to change any time soon, last time this was updates was several major versions ago.
+                 object.addProperty("protocol", SharedConstants.getProtocolVersion());
+-               // object.addProperty("generator", "thecolonel63's Server Side Replay Recorder " + placeholders.getString("version") + "-" + placeholders.getString("build"));
+                 object.addProperty("selfId", -1);
+                 object.add("players", new JsonArray());
+                 FileWriter fw = new FileWriter(Paths.get(tmp_folder.getAbsolutePath(), "metaData.json").toFile(), false);
+diff --git a/src/main/java/net/minecraft/serversidereplayrecorder/util/FileHandlingUtility.java b/src/main/java/net/minecraft/serversidereplayrecorder/util/FileHandlingUtility.java
+index 13ffb6123158c09605a0030afa35d2ca541eb5ad..19e7c8fa2c1390f534972884ddd9877fbf73f2b0 100644
+--- a/src/main/java/net/minecraft/serversidereplayrecorder/util/FileHandlingUtility.java
++++ b/src/main/java/net/minecraft/serversidereplayrecorder/util/FileHandlingUtility.java
+@@ -1,5 +1,7 @@
+ package net.minecraft.serversidereplayrecorder.util;
+ 
++import net.minecraft.ChatFormatting;
++import net.minecraft.network.chat.ClickEvent;
+ import net.minecraft.network.chat.Component;
+ import net.minecraft.serversidereplayrecorder.ServerSideReplayRecorderServer;
+ import org.jetbrains.annotations.NotNull;
+@@ -149,18 +151,18 @@ public class FileHandlingUtility {
+ 
+         Component response_text = Component.literal(response);
+ 
+-//        if (ServerSideReplayRecorderServer.upload_sites.containsKey(url.getHost())){
+-//            String regex = ServerSideReplayRecorderServer.upload_sites.getString(url.getHost());
+-//            Pattern pattern = Pattern.compile(regex);
+-//            Matcher matcher = pattern.matcher(response);
+-//            if (matcher.find()){
+-//                String download_url = matcher.group(1);
+-//                response_text = Component.literal("%s download link: ".formatted(file.getName())).formatted(Formatting.YELLOW)
+-//                        .append(Component.literal(download_url)
+-//                                .formatted(Formatting.UNDERLINE,Formatting.BLUE)
+-//                                .styled(style -> style.withClickEvent(new ClickEvent(ClickEvent.Action.OPEN_URL, download_url))));
+-//            }
+-//        }
++        if (ServerSideReplayRecorderServer.upload_sites.containsKey(url.getHost())){
++            String regex = ServerSideReplayRecorderServer.upload_sites.getString(url.getHost());
++            Pattern pattern = Pattern.compile(regex);
++            Matcher matcher = pattern.matcher(response);
++            if (matcher.find()){
++                String download_url = matcher.group(1);
++                response_text = Component.literal("%s download link: ".formatted(file.getName())).withStyle(ChatFormatting.YELLOW)
++                        .append(Component.literal(download_url)
++                                .withStyle(ChatFormatting.UNDERLINE,ChatFormatting.BLUE)
++                                .withStyle(style -> style.withClickEvent(new ClickEvent(ClickEvent.Action.OPEN_URL, download_url))));
++            }
++        }
+ 
+         return response_text;
+     }
+diff --git a/src/main/resources/upload_sites.properties b/src/main/resources/upload_sites.properties
+new file mode 100644
+index 0000000000000000000000000000000000000000..49bc43c610f43604db01e254929d3c27c7152d70
+--- /dev/null
++++ b/src/main/resources/upload_sites.properties
+@@ -0,0 +1,2 @@
++file.io: \\{"success":true,"status":200,.*"link":"(http[^"]+)".*\\}
++tmpfiles.org: \\{"status":"success",.*"data":\\{.*"url":"(http[^"]+)".*\\}.*\\}
+\ No newline at end of file

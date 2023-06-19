@@ -5,7 +5,7 @@ Subject: [PATCH] ServerSideRecorder
 
 
 diff --git a/build.gradle.kts b/build.gradle.kts
-index 215366d7cc3720805d2dfde0662372ecede8383c..a95cc98f7051c7069ca91aabec389b33306b2712 100644
+index b528f4b837f4c29ee8d4da7ef1b9413ae254ecf0..4fa7dd3f6f0bb814f2f561d96b035f325a98d263 100644
 --- a/build.gradle.kts
 +++ b/build.gradle.kts
 @@ -35,6 +35,7 @@ dependencies {

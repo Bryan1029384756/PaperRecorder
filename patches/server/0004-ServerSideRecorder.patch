@@ -124,7 +124,7 @@ index b7a1cbc2d15c6a0e6b7c95c4776a56b8820aab9f..3120a7b88378b2a08f2a2b6f1f64b012
 +    }
  }
 diff --git a/src/main/java/net/minecraft/server/MinecraftServer.java b/src/main/java/net/minecraft/server/MinecraftServer.java
-index c7a762abdfdc88fd26ec751c34e7b42bb3514515..691952c9cc3cbe991bea7457185a6776023187b8 100644
+index 5af80eb3959382abf31d273e2069ed558c478716..bbad3aee3fe5c20abc8c96baff78b0e2f07abf0e 100644
 --- a/src/main/java/net/minecraft/server/MinecraftServer.java
 +++ b/src/main/java/net/minecraft/server/MinecraftServer.java
 @@ -101,6 +101,8 @@ import net.minecraft.server.players.GameProfileCache;

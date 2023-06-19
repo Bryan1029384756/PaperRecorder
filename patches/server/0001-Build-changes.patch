@@ -5,7 +5,7 @@ Subject: [PATCH] Build changes
 
 
 diff --git a/build.gradle.kts b/build.gradle.kts
-index 19186e436cd6a5f00f0b42ac11f8050ad2ef6713..215366d7cc3720805d2dfde0662372ecede8383c 100644
+index 19186e436cd6a5f00f0b42ac11f8050ad2ef6713..b528f4b837f4c29ee8d4da7ef1b9413ae254ecf0 100644
 --- a/build.gradle.kts
 +++ b/build.gradle.kts
 @@ -7,8 +7,12 @@ plugins {
@@ -42,7 +42,7 @@ index 19186e436cd6a5f00f0b42ac11f8050ad2ef6713..215366d7cc3720805d2dfde0662372ec
      standardInput = System.`in`
      workingDir = rootProject.layout.projectDirectory
 diff --git a/src/main/java/com/destroystokyo/paper/Metrics.java b/src/main/java/com/destroystokyo/paper/Metrics.java
-index 4b002e8b75d117b726b0de274a76d3596fce015b..58dc84b7b3b04c2d0b00fc5fac5303d3378b3467 100644
+index 4b002e8b75d117b726b0de274a76d3596fce015b..b890dc7894d952f85b987dd3a16f2b75d85df54d 100644
 --- a/src/main/java/com/destroystokyo/paper/Metrics.java
 +++ b/src/main/java/com/destroystokyo/paper/Metrics.java
 @@ -593,7 +593,7 @@ public class Metrics {
@@ -64,7 +64,7 @@ index 4b002e8b75d117b726b0de274a76d3596fce015b..58dc84b7b3b04c2d0b00fc5fac5303d3
                  metrics.addCustomChart(new Metrics.DrilldownPie("java_version", () -> {
                      Map<String, Map<String, Integer>> map = new HashMap<>();
 diff --git a/src/main/java/com/destroystokyo/paper/PaperVersionFetcher.java b/src/main/java/com/destroystokyo/paper/PaperVersionFetcher.java
-index 9d687da5bdf398bb3f6c84cdf1249a7213d09f2e..e2f704c115fd6e00960bb56bb0779f1100c89c17 100644
+index 9d687da5bdf398bb3f6c84cdf1249a7213d09f2e..99b5c35b810f95502ec1c3a2ddabfc120819ab00 100644
 --- a/src/main/java/com/destroystokyo/paper/PaperVersionFetcher.java
 +++ b/src/main/java/com/destroystokyo/paper/PaperVersionFetcher.java
 @@ -31,8 +31,8 @@ public class PaperVersionFetcher implements VersionFetcher {
@@ -88,7 +88,7 @@ index 9d687da5bdf398bb3f6c84cdf1249a7213d09f2e..e2f704c115fd6e00960bb56bb0779f11
              ).openBufferedStream()) {
                  JsonObject json = new Gson().fromJson(reader, JsonObject.class);
 diff --git a/src/main/java/net/minecraft/server/MinecraftServer.java b/src/main/java/net/minecraft/server/MinecraftServer.java
-index 80cf4852e4010eeeadaf920ab927a40df0179b40..c7a762abdfdc88fd26ec751c34e7b42bb3514515 100644
+index 80cf4852e4010eeeadaf920ab927a40df0179b40..5af80eb3959382abf31d273e2069ed558c478716 100644
 --- a/src/main/java/net/minecraft/server/MinecraftServer.java
 +++ b/src/main/java/net/minecraft/server/MinecraftServer.java
 @@ -1679,7 +1679,7 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
@@ -101,7 +101,7 @@ index 80cf4852e4010eeeadaf920ab927a40df0179b40..c7a762abdfdc88fd26ec751c34e7b42b
  
      public SystemReport fillSystemReport(SystemReport details) {
 diff --git a/src/main/java/org/bukkit/craftbukkit/CraftServer.java b/src/main/java/org/bukkit/craftbukkit/CraftServer.java
-index 59984cb8ba9ffb66b59a2c907e4f04b5a51ea8ed..edb26528b943f13aa45aba6bcaf63f5403f2f897 100644
+index 59984cb8ba9ffb66b59a2c907e4f04b5a51ea8ed..04b97d1e8194e5b59f0be208cb85a6042e2cfdf4 100644
 --- a/src/main/java/org/bukkit/craftbukkit/CraftServer.java
 +++ b/src/main/java/org/bukkit/craftbukkit/CraftServer.java
 @@ -261,7 +261,7 @@ import javax.annotation.Nullable; // Paper
@@ -114,7 +114,7 @@ index 59984cb8ba9ffb66b59a2c907e4f04b5a51ea8ed..edb26528b943f13aa45aba6bcaf63f54
      private final String bukkitVersion = Versioning.getBukkitVersion();
      private final Logger logger = Logger.getLogger("Minecraft");
 diff --git a/src/main/java/org/bukkit/craftbukkit/util/Versioning.java b/src/main/java/org/bukkit/craftbukkit/util/Versioning.java
-index 774556a62eb240da42e84db4502e2ed43495be17..e9b6ca3aa25e140467ae866d572483050ea3fa0e 100644
+index 774556a62eb240da42e84db4502e2ed43495be17..cf7b2d26fa898255f71dbea2096af8081c8a5b42 100644
 --- a/src/main/java/org/bukkit/craftbukkit/util/Versioning.java
 +++ b/src/main/java/org/bukkit/craftbukkit/util/Versioning.java
 @@ -11,7 +11,7 @@ public final class Versioning {

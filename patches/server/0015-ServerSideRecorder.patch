@@ -1,0 +1,40 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Bryan1029384756 <23323626+Bryan1029384756@users.noreply.github.com>
+Date: Sun, 18 Jun 2023 21:37:53 -0500
+Subject: [PATCH] ServerSideRecorder
+
+
+diff --git a/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java b/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java
+index bdde12d6b92e0f5c132f283062819d52efd2b3b7..e4ebc83cf1543c301b440567f08d962b729354e3 100644
+--- a/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java
++++ b/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java
+@@ -485,13 +485,6 @@ public class ServerGamePacketListenerImpl implements ServerPlayerConnection, Tic
+     }
+ 
+     public void disconnect(net.kyori.adventure.text.Component reason, org.bukkit.event.player.PlayerKickEvent.Cause cause) {
+-        //ServersideRecorder start
+-        if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("ServerGamePacketListenerImpl.disconnect: disconnected");
+-        if(this.connection.getRecorder() != null){
+-            if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("ServerGamePacketListenerImpl.disconnect: getRecorder");
+-            this.connection.getRecorder().handleDisconnect();
+-        }
+-        //ServersideRecorder end
+ 
+         // Paper end
+         // CraftBukkit start - fire PlayerKickEvent
+@@ -2106,6 +2099,15 @@ public class ServerGamePacketListenerImpl implements ServerPlayerConnection, Tic
+ 
+     @Override
+     public void onDisconnect(Component reason) {
++        //ServersideRecorder start
++        if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("ServerGamePacketListenerImpl.disconnect: disconnected");
++        if(this.connection.getRecorder() != null){
++            if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("ServerGamePacketListenerImpl.disconnect: getRecorder");
++            this.connection.getRecorder().handleDisconnect();
++        }else{
++            if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("ServerGamePacketListenerImpl.disconnect: getRecorder null");
++        }
++        //ServersideRecorder end
+         // Paper start
+         this.onDisconnect(reason, null);
+     }

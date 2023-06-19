@@ -1,0 +1,57 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Bryan1029384756 <23323626+Bryan1029384756@users.noreply.github.com>
+Date: Sun, 18 Jun 2023 20:13:13 -0500
+Subject: [PATCH] ServerSideRecorder
+
+
+diff --git a/src/main/java/net/minecraft/serversidereplayrecorder/recorder/ReplayRecorder.java b/src/main/java/net/minecraft/serversidereplayrecorder/recorder/ReplayRecorder.java
+index 324e2b9fe2e4141cac1ec0a1d2ef8fe9710f94e6..4c1e74dc5acb0519a15f7274f3e7983737292f09 100644
+--- a/src/main/java/net/minecraft/serversidereplayrecorder/recorder/ReplayRecorder.java
++++ b/src/main/java/net/minecraft/serversidereplayrecorder/recorder/ReplayRecorder.java
+@@ -305,12 +305,14 @@ public abstract class ReplayRecorder {
+ 
+     public void onServerTick(){
+         if (Thread.currentThread() == ms.getRunningThread()){
++
+             if (!this.open.get())
+                 return;
+             int old_timestamp = this.server_timestamp.get();
+             int new_timestamp = (ms.getTickCount() - server_start.get()) * 50;
+             this.server_timestamp.set(new_timestamp);
+             if (ServerSideReplayRecorderServer.config.use_server_timestamps()){
++                if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("ReplayRecorder.onServerTick: use_server_timestamps");
+                 Queue<Packet<?>> tick_packets = this.packetQueue.getAndSet(new ConcurrentLinkedQueue<>());
+                 this.fileWriterExecutor.execute(()->{
+                     double delta = (new_timestamp - old_timestamp)/(double)tick_packets.size();
+@@ -352,12 +354,13 @@ public abstract class ReplayRecorder {
+     private final AtomicBoolean metadataQueued = new AtomicBoolean(false);
+ 
+     private void _save(Packet<?> packet, int timestamp) {
+-
++        if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("ReplayRecorder._save: ");
+         if(this.current_file_size.get() > ServerSideReplayRecorderServer.config.getMax_file_size()){
+             if (tooBigFileSize.compareAndSet(false,true)) {
+                 ServerSideReplayRecorderServer.LOGGER.warn("Max File Size Reached, stopping recording %s:%s".formatted(this.getClass().getSimpleName(), this.getRecordingName()));
+                 this.handleDisconnect(true);
+             }
++            if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("ReplayRecorder._save: big return");
+             return;
+         }
+ 
+@@ -388,13 +391,15 @@ public abstract class ReplayRecorder {
+                 }
+ 
+                 if (packetId == null) {
++                    if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("ReplayRecorder._save: packetId null");
+                     //The packet ID is something we do not have an ID for.
+                     throw new IOException("Unknown packet ID for class " + packet.getClass());
+                 } else {
++                    if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("ReplayRecorder._save: packetId:" + packetId);
+                     //Write the packet ID.
+                     buffer.write(packetId);
+                 }
+-
++                if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("ReplayRecorder._save: Write packet");
+                 //Write the packet.
+                 buffer.write(buf.array(), 0, buf.readableBytes());
+                 bos.write(buffer.toByteArray());

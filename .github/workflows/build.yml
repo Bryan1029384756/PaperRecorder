@@ -48,7 +48,7 @@ jobs:
           file: build/libs/*
           file_glob: true
           tag: "v1_20_1-${{ env.Compile_Date }}"
-          release_name: "1.20.1_PaperRecord-${{ env.Compile_Date }}"
+          release_name: "1.20.1_PaperRecord-Paper_Upstream-${{ env.Compile_Date }}"
           overwrite: true
           prerelease: true
           body: |

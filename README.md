@@ -1,4 +1,9 @@
 ## Overview
+Experimental build with [Simple Voice Chat](https://modrinth.com/plugin/simple-voice-chat) integration.
+
+Currently, records all voices from players and places it into its own audio track in the voices folder.
+
+
 PaperRecorder is a Fork of paper allowing players to record players and replay it using the replay mod. <br>
 Original Mod for ServerSideReplayRecorder https://github.com/thecolonel63/server-side-replay-recorder
 

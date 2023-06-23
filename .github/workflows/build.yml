@@ -31,27 +31,3 @@ jobs:
         run: ./gradlew applyPatches
       - name: Build Bundler & Paperclip
         run: ./gradlew createReobfBundlerJar
-      - name: capture build artifacts
-        uses: actions/upload-artifact@v2
-        with:
-          name: Artifacts
-          path: build/libs/
-      - name: Create Release Tag
-        uses: rickstaa/action-create-tag@v1
-        with:
-          tag: "v1_20_1-${{ env.Compile_Date }}"
-          message: "1.20.1 Build ${{ env.Compile_Date }}"
-      - name: Upload Build to Release
-        uses: svenstaro/upload-release-action@v2
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: build/libs/*
-          file_glob: true
-          tag: "v1_20_1-${{ env.Compile_Date }}"
-          release_name: "1.20.1_PaperRecord-${{ env.Compile_Date }}"
-          overwrite: true
-          prerelease: false
-          body: |
-            PaperRecord Build
-            Version: 1.20.1
-            Build Time: ${{ env.Compile_Date }}

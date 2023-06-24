@@ -39,7 +39,7 @@ jobs:
       - name: Create Release Tag
         uses: rickstaa/action-create-tag@v1
         with:
-          tag: "aea9cdd"
+          tag: "b34d4ec"
           message: "1.20.1 Paper_Upstream Build ${{ env.Compile_Date }}"
       - name: Upload Build to Release
         uses: svenstaro/upload-release-action@v2
@@ -47,7 +47,7 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: build/libs/*
           file_glob: true
-          tag: "aea9cdd"
+          tag: "b34d4ec"
           release_name: "1.20.1_PaperRecord-Paper_Upstream-${{ env.Compile_Date }}"
           overwrite: true
           prerelease: true

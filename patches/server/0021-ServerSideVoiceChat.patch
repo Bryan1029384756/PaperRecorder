@@ -1,0 +1,437 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Bryan1029384756 <23323626+Bryan1029384756@users.noreply.github.com>
+Date: Sun, 25 Jun 2023 18:23:30 -0500
+Subject: [PATCH] ServerSideVoiceChat
+
+
+diff --git a/src/main/java/net/minecraft/serversidereplayrecorder/voice/ServerSideVoiceChat.java b/src/main/java/net/minecraft/serversidereplayrecorder/voice/ServerSideVoiceChat.java
+index b5ddb3a6b717d283f2f7cc3b475b03aa0b527ea6..093d1a39efe81c137674d6c650a31bf243ecdbf7 100644
+--- a/src/main/java/net/minecraft/serversidereplayrecorder/voice/ServerSideVoiceChat.java
++++ b/src/main/java/net/minecraft/serversidereplayrecorder/voice/ServerSideVoiceChat.java
+@@ -2,11 +2,12 @@ package net.minecraft.serversidereplayrecorder.voice;
+ 
+ import de.maxhenkel.voicechat.api.VoicechatApi;
+ import de.maxhenkel.voicechat.api.VoicechatPlugin;
+-import de.maxhenkel.voicechat.api.events.EventRegistration;
+-import de.maxhenkel.voicechat.api.events.MicrophonePacketEvent;
++import de.maxhenkel.voicechat.api.VoicechatServerApi;
++import de.maxhenkel.voicechat.api.events.*;
+ import de.maxhenkel.voicechat.api.opus.OpusDecoder;
+ import net.minecraft.server.level.ServerPlayer;
+ import net.minecraft.serversidereplayrecorder.ServerSideReplayRecorderServer;
++import net.minecraft.serversidereplayrecorder.voice.recording.VoicechatRecorder;
+ import org.bukkit.Bukkit;
+ import javax.sound.sampled.*;
+ import java.io.*;
+@@ -18,7 +19,8 @@ import java.util.*;
+ public class ServerSideVoiceChat implements VoicechatPlugin {
+ 
+     private OpusDecoder decoder;
+-
++    public static double distance;
++    public static VoicechatApi SERVERAPI;
+     @Override
+     public String getPluginId() {
+         return "PaperRecord";
+@@ -27,15 +29,22 @@ public class ServerSideVoiceChat implements VoicechatPlugin {
+     @Override
+     public void initialize(VoicechatApi api) {
+         System.out.println("Started recording voice chat using PaperRecord");
++        this.distance = api.getVoiceChatDistance();
++        this.SERVERAPI = api;
+     }
+ 
+     @Override
+     public void registerEvents(EventRegistration registration) {
+-         registration.registerEvent(MicrophonePacketEvent.class, this::onSound);
++        registration.registerEvent(EntitySoundPacketEvent.class, VoicechatRecorder::onEntitySound);
++        registration.registerEvent(LocationalSoundPacketEvent.class, VoicechatRecorder::onLocationalSound);
++        registration.registerEvent(StaticSoundPacketEvent.class, VoicechatRecorder::onStaticSound);
++        //registration.registerEvent(ClientSoundEvent.class, VoicechatRecorder::onSound);
++        // registration.registerEvent(MicrophonePacketEvent.class, this::onSound);
+     }
+ 
+ 
+ 
++
+     public Map<UUID, List<byte[]>> playerPacketMap = new HashMap<>();
+     private Map<UUID, Long> lastPacketTimeMap = new HashMap<>();
+     private static final int FRAME_SIZE_MS = 20; // Frame size in milliseconds
+diff --git a/src/main/java/net/minecraft/serversidereplayrecorder/voice/Utils.java b/src/main/java/net/minecraft/serversidereplayrecorder/voice/Utils.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..36132fcf9b14c52b9e81929172fea8277b28fbc8
+--- /dev/null
++++ b/src/main/java/net/minecraft/serversidereplayrecorder/voice/Utils.java
+@@ -0,0 +1,34 @@
++package net.minecraft.serversidereplayrecorder.voice;
++
++public class Utils {
++
++    public static short[] bytesToShorts(byte[] bytes) {
++        if (bytes.length % 2 != 0) {
++            throw new IllegalArgumentException("Input bytes need to be divisible by 2");
++        }
++        short[] data = new short[bytes.length / 2];
++        for (int i = 0; i < bytes.length; i += 2) {
++            data[i / 2] = bytesToShort(bytes[i], bytes[i + 1]);
++        }
++        return data;
++    }
++
++    public static byte[] shortsToBytes(short[] shorts) {
++        byte[] data = new byte[shorts.length * 2];
++        for (int i = 0; i < shorts.length; i++) {
++            byte[] split = shortToBytes(shorts[i]);
++            data[i * 2] = split[0];
++            data[i * 2 + 1] = split[1];
++        }
++        return data;
++    }
++
++    public static short bytesToShort(byte b1, byte b2) {
++        return (short) (((b2 & 0xFF) << 8) | (b1 & 0xFF));
++    }
++
++    public static byte[] shortToBytes(short s) {
++        return new byte[]{(byte) (s & 0xFF), (byte) ((s >> 8) & 0xFF)};
++    }
++
++}
+diff --git a/src/main/java/net/minecraft/serversidereplayrecorder/voice/net/AbstractSoundPacket.java b/src/main/java/net/minecraft/serversidereplayrecorder/voice/net/AbstractSoundPacket.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..9546f9d8e0fcc92d049a2e716398556f1b24a141
+--- /dev/null
++++ b/src/main/java/net/minecraft/serversidereplayrecorder/voice/net/AbstractSoundPacket.java
+@@ -0,0 +1,51 @@
++package net.minecraft.serversidereplayrecorder.voice.net;
++
++import net.minecraft.network.FriendlyByteBuf;
++import net.minecraft.serversidereplayrecorder.voice.Utils;
++
++import java.util.UUID;
++
++public abstract class AbstractSoundPacket<T extends Packet<T>> implements Packet<T> {
++
++    public static final short CURRENT_VERSION = 1;
++
++    protected short version;
++    protected UUID id;
++    protected short[] rawAudio;
++
++    public AbstractSoundPacket(UUID id, short[] rawAudio) {
++        version = CURRENT_VERSION;
++        this.id = id;
++        this.rawAudio = rawAudio;
++    }
++
++    public AbstractSoundPacket() {
++
++    }
++
++    public UUID getId() {
++        return id;
++    }
++
++    public short[] getRawAudio() {
++        return rawAudio;
++    }
++
++    @Override
++    public T fromBytes(FriendlyByteBuf buf) throws VersionCompatibilityException {
++        version = buf.readShort();
++        if (version != CURRENT_VERSION && version != 0) {
++            throw new VersionCompatibilityException("Incompatible version");
++        }
++        id = buf.readUUID();
++        rawAudio = Utils.bytesToShorts(buf.readByteArray());
++        return (T) this;
++    }
++
++    @Override
++    public void toBytes(FriendlyByteBuf buf) {
++        buf.writeShort(version);
++        buf.writeUUID(id);
++        buf.writeByteArray(Utils.shortsToBytes(rawAudio));
++    }
++}
+diff --git a/src/main/java/net/minecraft/serversidereplayrecorder/voice/net/EntitySoundPacket.java b/src/main/java/net/minecraft/serversidereplayrecorder/voice/net/EntitySoundPacket.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..f767678d31b5c8525eaf501878e112b4cb0c277b
+--- /dev/null
++++ b/src/main/java/net/minecraft/serversidereplayrecorder/voice/net/EntitySoundPacket.java
+@@ -0,0 +1,64 @@
++package net.minecraft.serversidereplayrecorder.voice.net;
++
++
++import net.minecraft.network.FriendlyByteBuf;
++import net.minecraft.resources.ResourceLocation;
++import net.minecraft.serversidereplayrecorder.voice.ServerSideVoiceChat;
++
++import java.util.UUID;
++
++public class EntitySoundPacket extends AbstractSoundPacket<EntitySoundPacket> {
++
++    public static ResourceLocation ID = new ResourceLocation("PaperRecord", "entity_sound");
++
++    private boolean whispering;
++    private float distance;
++
++    public EntitySoundPacket(UUID id, short[] rawAudio, boolean whispering, float distance) {
++        super(id, rawAudio);
++        this.whispering = whispering;
++        this.distance = distance;
++    }
++
++    public EntitySoundPacket() {
++
++    }
++
++    @Override
++    public ResourceLocation getIdentifier() {
++        return ID;
++    }
++
++    public boolean isWhispering() {
++        return whispering;
++    }
++
++    public float getDistance() {
++        return distance;
++    }
++
++    @Override
++    public EntitySoundPacket fromBytes(FriendlyByteBuf buf) throws VersionCompatibilityException {
++        super.fromBytes(buf);
++        whispering = buf.readBoolean();
++        if (version >= 1) {
++            distance = buf.readFloat();
++        } else {
++            distance = (float) ServerSideVoiceChat.distance;
++        }
++        return this;
++    }
++
++    @Override
++    public void toBytes(FriendlyByteBuf buf) {
++        super.toBytes(buf);
++        buf.writeBoolean(whispering);
++        buf.writeFloat(distance);
++    }
++
++//    @Override
++//    public void onPacket() {
++//        AudioPlaybackManager.INSTANCE.onEntitySound(this);
++//    }
++
++}
+diff --git a/src/main/java/net/minecraft/serversidereplayrecorder/voice/net/LocationalSoundPacket.java b/src/main/java/net/minecraft/serversidereplayrecorder/voice/net/LocationalSoundPacket.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..a035e09d1f5f1fa6e8e294bd52a25ad0e66683ca
+--- /dev/null
++++ b/src/main/java/net/minecraft/serversidereplayrecorder/voice/net/LocationalSoundPacket.java
+@@ -0,0 +1,66 @@
++package net.minecraft.serversidereplayrecorder.voice.net;
++
++import de.maxhenkel.voicechat.api.Position;
++import net.minecraft.network.FriendlyByteBuf;
++import net.minecraft.resources.ResourceLocation;
++import net.minecraft.serversidereplayrecorder.voice.ServerSideVoiceChat;
++
++import java.util.UUID;
++
++public class LocationalSoundPacket extends AbstractSoundPacket<LocationalSoundPacket> {
++
++    public static ResourceLocation ID = new ResourceLocation("PaperRecord", "locational_sound");
++
++    private Position location;
++    private float distance;
++
++    public LocationalSoundPacket(UUID id, short[] rawAudio, Position location, float distance) {
++        super(id, rawAudio);
++        this.location = location;
++        this.distance = distance;
++    }
++
++    public LocationalSoundPacket() {
++
++    }
++
++    public Position getLocation() {
++        return location;
++    }
++
++    public float getDistance() {
++        return distance;
++    }
++
++    @Override
++    public ResourceLocation getIdentifier() {
++        return ID;
++    }
++
++    @Override
++    public LocationalSoundPacket fromBytes(FriendlyByteBuf buf) throws VersionCompatibilityException {
++        super.fromBytes(buf);
++        location = ServerSideVoiceChat.SERVERAPI.createPosition(buf.readDouble(), buf.readDouble(), buf.readDouble());
++        if (version >= 1) {
++            distance = buf.readFloat();
++        } else {
++            distance = (float) ServerSideVoiceChat.distance;
++        }
++        return this;
++    }
++
++    @Override
++    public void toBytes(FriendlyByteBuf buf) {
++        super.toBytes(buf);
++        buf.writeDouble(location.getX());
++        buf.writeDouble(location.getY());
++        buf.writeDouble(location.getZ());
++        buf.writeFloat(distance);
++    }
++
++//    @Override
++//    public void onPacket() {
++//        AudioPlaybackManager.INSTANCE.onLocationalSound(this);
++//    }
++
++}
+diff --git a/src/main/java/net/minecraft/serversidereplayrecorder/voice/net/Packet.java b/src/main/java/net/minecraft/serversidereplayrecorder/voice/net/Packet.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..0913d06dcdc14c618aea3b8d19b36be16e70ae7e
+--- /dev/null
++++ b/src/main/java/net/minecraft/serversidereplayrecorder/voice/net/Packet.java
+@@ -0,0 +1,15 @@
++package net.minecraft.serversidereplayrecorder.voice.net;
++
++import net.minecraft.network.FriendlyByteBuf;
++import net.minecraft.resources.ResourceLocation;
++
++public interface Packet<T extends Packet<T>> {
++
++    ResourceLocation getIdentifier();
++
++    T fromBytes(FriendlyByteBuf buf) throws VersionCompatibilityException;
++
++    void toBytes(FriendlyByteBuf buf);
++
++
++}
+diff --git a/src/main/java/net/minecraft/serversidereplayrecorder/voice/net/StaticSoundPacket.java b/src/main/java/net/minecraft/serversidereplayrecorder/voice/net/StaticSoundPacket.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..15934e72e926d4dae343d6fc0b283c078487c741
+--- /dev/null
++++ b/src/main/java/net/minecraft/serversidereplayrecorder/voice/net/StaticSoundPacket.java
+@@ -0,0 +1,25 @@
++package net.minecraft.serversidereplayrecorder.voice.net;
++
++import net.minecraft.resources.ResourceLocation;
++
++import java.util.UUID;
++
++public class StaticSoundPacket extends AbstractSoundPacket<StaticSoundPacket> {
++
++    public static ResourceLocation ID = new ResourceLocation("PaperRecord", "static_sound");
++
++    public StaticSoundPacket(UUID id, short[] rawAudio) {
++        super(id, rawAudio);
++    }
++
++    public StaticSoundPacket() {
++
++    }
++
++    @Override
++    public ResourceLocation getIdentifier() {
++        return ID;
++    }
++
++
++}
+diff --git a/src/main/java/net/minecraft/serversidereplayrecorder/voice/net/VersionCompatibilityException.java b/src/main/java/net/minecraft/serversidereplayrecorder/voice/net/VersionCompatibilityException.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..bdeee43a3512ed64d07051d89e49f6dfb7a7379e
+--- /dev/null
++++ b/src/main/java/net/minecraft/serversidereplayrecorder/voice/net/VersionCompatibilityException.java
+@@ -0,0 +1,8 @@
++package net.minecraft.serversidereplayrecorder.voice.net;
++
++public class VersionCompatibilityException extends Exception {
++
++    public VersionCompatibilityException(String message) {
++        super(message);
++    }
++}
+diff --git a/src/main/java/net/minecraft/serversidereplayrecorder/voice/recording/VoicechatRecorder.java b/src/main/java/net/minecraft/serversidereplayrecorder/voice/recording/VoicechatRecorder.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..9f6d7d9e00a8ff4c1a6f5f274ce4479199826496
+--- /dev/null
++++ b/src/main/java/net/minecraft/serversidereplayrecorder/voice/recording/VoicechatRecorder.java
+@@ -0,0 +1,67 @@
++package net.minecraft.serversidereplayrecorder.voice.recording;
++
++
++import de.maxhenkel.voicechat.api.events.*;
++import de.maxhenkel.voicechat.api.opus.OpusDecoder;
++import de.maxhenkel.voicechat.api.packets.SoundPacket;
++import io.netty.buffer.Unpooled;
++import net.minecraft.network.FriendlyByteBuf;
++import net.minecraft.network.protocol.game.ClientboundCustomPayloadPacket;
++import net.minecraft.server.MinecraftServer;
++import net.minecraft.serversidereplayrecorder.ServerSideReplayRecorderServer;
++import net.minecraft.serversidereplayrecorder.recorder.ReplayRecorder;
++import net.minecraft.serversidereplayrecorder.voice.net.EntitySoundPacket;
++import net.minecraft.serversidereplayrecorder.voice.net.LocationalSoundPacket;
++import net.minecraft.serversidereplayrecorder.voice.net.Packet;
++import net.minecraft.serversidereplayrecorder.voice.net.StaticSoundPacket;
++
++import java.util.UUID;
++
++public class VoicechatRecorder {
++
++//    private static final Minecraft MC = Minecraft.getInstance();
++
++    public static void onEntitySound(EntitySoundPacketEvent event) {
++        short[] rawAudio = getRawAudio(event, event.getPacket());
++        send(new EntitySoundPacket(event.getPacket().getEntityUuid(), rawAudio,  event.getPacket().isWhispering(), event.getPacket().getDistance()));
++    }
++
++    public static void onLocationalSound(LocationalSoundPacketEvent event) {
++        short[] rawAudio = getRawAudio(event, event.getPacket());
++        send(new LocationalSoundPacket(event.getPacket().getSender(), rawAudio, event.getPacket().getPosition(), event.getPacket().getDistance()));
++    }
++
++    public static void onStaticSound(StaticSoundPacketEvent event) {
++        short[] rawAudio = getRawAudio(event, event.getPacket());
++        send(new StaticSoundPacket(event.getPacket().getSender(), rawAudio));
++    }
++
++    public static short[] getRawAudio(SoundPacketEvent<?> event, SoundPacket packet){
++        OpusDecoder decoder = event.getVoicechat().createDecoder();
++
++        byte[] opusData = packet.getOpusEncodedData();
++        return decoder.decode(opusData);
++    }
++
++//    public static void onSound(ClientSoundEvent event) {
++//        UUID id = ClientManager.getPlayerStateManager().getOwnID();
++//        short[] rawAudio = event.getRawAudio();
++//
++//        if (ReplayVoicechatPlugin.CLIENT_API.getGroup() != null) {
++//            send(new StaticSoundPacket(id, rawAudio));
++//        } else {
++//            send(new EntitySoundPacket(id, rawAudio, event.isWhispering(), (float) ReplayVoicechatPlugin.CLIENT_API.getVoiceChatDistance()));
++//        }
++//    }
++
++    public static void send(Packet<?> packet) {
++        FriendlyByteBuf buf = new FriendlyByteBuf(Unpooled.buffer());
++        packet.toBytes(buf);
++        ClientboundCustomPayloadPacket fakeP = new ClientboundCustomPayloadPacket(packet.getIdentifier(), buf);
++        for (ReplayRecorder recorder : ReplayRecorder.active_recorders){
++            recorder.onPacket(fakeP);
++        }
++       // ReplayInterface.INSTANCE.sendFakePacket(packet.getIdentifier(), buf);
++    }
++
++}

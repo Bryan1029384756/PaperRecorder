@@ -2,7 +2,7 @@ name: Patch and Build
 
 on:
   push:
-    branches: [ "master", "paper_upstream"]
+    branches: [ "**"]
   pull_request:
 
 jobs:

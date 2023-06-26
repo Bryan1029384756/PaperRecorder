@@ -1,0 +1,196 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Bryan1029384756 <23323626+Bryan1029384756@users.noreply.github.com>
+Date: Sun, 25 Jun 2023 19:24:20 -0500
+Subject: [PATCH] ServerSideVoiceChat
+
+
+diff --git a/src/main/java/net/minecraft/serversidereplayrecorder/recorder/ReplayRecorder.java b/src/main/java/net/minecraft/serversidereplayrecorder/recorder/ReplayRecorder.java
+index f0627468012f1725ff4493e559ad8636e122460e..b4450cb0ba56b113d21da107951f4d4c49975c6e 100644
+--- a/src/main/java/net/minecraft/serversidereplayrecorder/recorder/ReplayRecorder.java
++++ b/src/main/java/net/minecraft/serversidereplayrecorder/recorder/ReplayRecorder.java
+@@ -330,7 +330,7 @@ public abstract class ReplayRecorder {
+ 
+     protected final AtomicReference<Queue<Packet<?>>> packetQueue = new AtomicReference<>(new ConcurrentLinkedQueue<>());
+ 
+-    protected void save(Packet<?> packet) {
++    public void save(Packet<?> packet) {
+         if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("ReplayRecorder.save: ");
+         if (ServerSideReplayRecorderServer.config.use_server_timestamps()) {
+             if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("ReplayRecorder.save: use_server_timestamps");
+diff --git a/src/main/java/net/minecraft/serversidereplayrecorder/voice/ServerSideVoiceChat.java b/src/main/java/net/minecraft/serversidereplayrecorder/voice/ServerSideVoiceChat.java
+index 093d1a39efe81c137674d6c650a31bf243ecdbf7..1cd99d4708062328e338b25958cd3fabd15b25fb 100644
+--- a/src/main/java/net/minecraft/serversidereplayrecorder/voice/ServerSideVoiceChat.java
++++ b/src/main/java/net/minecraft/serversidereplayrecorder/voice/ServerSideVoiceChat.java
+@@ -2,7 +2,6 @@ package net.minecraft.serversidereplayrecorder.voice;
+ 
+ import de.maxhenkel.voicechat.api.VoicechatApi;
+ import de.maxhenkel.voicechat.api.VoicechatPlugin;
+-import de.maxhenkel.voicechat.api.VoicechatServerApi;
+ import de.maxhenkel.voicechat.api.events.*;
+ import de.maxhenkel.voicechat.api.opus.OpusDecoder;
+ import net.minecraft.server.level.ServerPlayer;
+@@ -18,7 +17,7 @@ import java.util.*;
+ 
+ public class ServerSideVoiceChat implements VoicechatPlugin {
+ 
+-    private OpusDecoder decoder;
++    public static OpusDecoder decoder;
+     public static double distance;
+     public static VoicechatApi SERVERAPI;
+     @Override
+@@ -28,6 +27,9 @@ public class ServerSideVoiceChat implements VoicechatPlugin {
+ 
+     @Override
+     public void initialize(VoicechatApi api) {
++        if (decoder == null) {
++            decoder = api.createDecoder();
++        }
+         System.out.println("Started recording voice chat using PaperRecord");
+         this.distance = api.getVoiceChatDistance();
+         this.SERVERAPI = api;
+@@ -38,13 +40,10 @@ public class ServerSideVoiceChat implements VoicechatPlugin {
+         registration.registerEvent(EntitySoundPacketEvent.class, VoicechatRecorder::onEntitySound);
+         registration.registerEvent(LocationalSoundPacketEvent.class, VoicechatRecorder::onLocationalSound);
+         registration.registerEvent(StaticSoundPacketEvent.class, VoicechatRecorder::onStaticSound);
+-        //registration.registerEvent(ClientSoundEvent.class, VoicechatRecorder::onSound);
+-        // registration.registerEvent(MicrophonePacketEvent.class, this::onSound);
++        registration.registerEvent(MicrophonePacketEvent.class, VoicechatRecorder::onSound);
+     }
+ 
+ 
+-
+-
+     public Map<UUID, List<byte[]>> playerPacketMap = new HashMap<>();
+     private Map<UUID, Long> lastPacketTimeMap = new HashMap<>();
+     private static final int FRAME_SIZE_MS = 20; // Frame size in milliseconds
+@@ -62,10 +61,6 @@ public class ServerSideVoiceChat implements VoicechatPlugin {
+     public void onSound(MicrophonePacketEvent event) {
+         UUID playerUuid = event.getSenderConnection().getPlayer().getUuid();
+ 
+-        if (decoder == null) {
+-            decoder = event.getVoicechat().createDecoder();
+-        }
+-
+         long now = System.currentTimeMillis();
+         long lastPacketTime = lastPacketTimeMap.get(playerUuid);
+         if (lastPacketTime != -1) {
+diff --git a/src/main/java/net/minecraft/serversidereplayrecorder/voice/net/EntitySoundPacket.java b/src/main/java/net/minecraft/serversidereplayrecorder/voice/net/EntitySoundPacket.java
+index f767678d31b5c8525eaf501878e112b4cb0c277b..57bccb828db34436c80d4ec05c71b33735cf5a46 100644
+--- a/src/main/java/net/minecraft/serversidereplayrecorder/voice/net/EntitySoundPacket.java
++++ b/src/main/java/net/minecraft/serversidereplayrecorder/voice/net/EntitySoundPacket.java
+@@ -9,7 +9,7 @@ import java.util.UUID;
+ 
+ public class EntitySoundPacket extends AbstractSoundPacket<EntitySoundPacket> {
+ 
+-    public static ResourceLocation ID = new ResourceLocation("PaperRecord", "entity_sound");
++    public static ResourceLocation ID = new ResourceLocation("replayvoicechat", "entity_sound");
+ 
+     private boolean whispering;
+     private float distance;
+diff --git a/src/main/java/net/minecraft/serversidereplayrecorder/voice/net/LocationalSoundPacket.java b/src/main/java/net/minecraft/serversidereplayrecorder/voice/net/LocationalSoundPacket.java
+index a035e09d1f5f1fa6e8e294bd52a25ad0e66683ca..6df16a76112407c65e7e6dad344a3c91d330bec4 100644
+--- a/src/main/java/net/minecraft/serversidereplayrecorder/voice/net/LocationalSoundPacket.java
++++ b/src/main/java/net/minecraft/serversidereplayrecorder/voice/net/LocationalSoundPacket.java
+@@ -9,7 +9,7 @@ import java.util.UUID;
+ 
+ public class LocationalSoundPacket extends AbstractSoundPacket<LocationalSoundPacket> {
+ 
+-    public static ResourceLocation ID = new ResourceLocation("PaperRecord", "locational_sound");
++    public static ResourceLocation ID = new ResourceLocation("replayvoicechat", "locational_sound");
+ 
+     private Position location;
+     private float distance;
+diff --git a/src/main/java/net/minecraft/serversidereplayrecorder/voice/net/StaticSoundPacket.java b/src/main/java/net/minecraft/serversidereplayrecorder/voice/net/StaticSoundPacket.java
+index 15934e72e926d4dae343d6fc0b283c078487c741..6280fe05ce1b60277eecbf35911d7f100a474443 100644
+--- a/src/main/java/net/minecraft/serversidereplayrecorder/voice/net/StaticSoundPacket.java
++++ b/src/main/java/net/minecraft/serversidereplayrecorder/voice/net/StaticSoundPacket.java
+@@ -6,7 +6,7 @@ import java.util.UUID;
+ 
+ public class StaticSoundPacket extends AbstractSoundPacket<StaticSoundPacket> {
+ 
+-    public static ResourceLocation ID = new ResourceLocation("PaperRecord", "static_sound");
++    public static ResourceLocation ID = new ResourceLocation("replayvoicechat", "static_sound");
+ 
+     public StaticSoundPacket(UUID id, short[] rawAudio) {
+         super(id, rawAudio);
+diff --git a/src/main/java/net/minecraft/serversidereplayrecorder/voice/recording/VoicechatRecorder.java b/src/main/java/net/minecraft/serversidereplayrecorder/voice/recording/VoicechatRecorder.java
+index 9f6d7d9e00a8ff4c1a6f5f274ce4479199826496..ca56f29556cfd1d6da95b930c6332b02d159658e 100644
+--- a/src/main/java/net/minecraft/serversidereplayrecorder/voice/recording/VoicechatRecorder.java
++++ b/src/main/java/net/minecraft/serversidereplayrecorder/voice/recording/VoicechatRecorder.java
+@@ -10,6 +10,7 @@ import net.minecraft.network.protocol.game.ClientboundCustomPayloadPacket;
+ import net.minecraft.server.MinecraftServer;
+ import net.minecraft.serversidereplayrecorder.ServerSideReplayRecorderServer;
+ import net.minecraft.serversidereplayrecorder.recorder.ReplayRecorder;
++import net.minecraft.serversidereplayrecorder.voice.ServerSideVoiceChat;
+ import net.minecraft.serversidereplayrecorder.voice.net.EntitySoundPacket;
+ import net.minecraft.serversidereplayrecorder.voice.net.LocationalSoundPacket;
+ import net.minecraft.serversidereplayrecorder.voice.net.Packet;
+@@ -19,49 +20,43 @@ import java.util.UUID;
+ 
+ public class VoicechatRecorder {
+ 
+-//    private static final Minecraft MC = Minecraft.getInstance();
+-
+     public static void onEntitySound(EntitySoundPacketEvent event) {
+-        short[] rawAudio = getRawAudio(event, event.getPacket());
+-        send(new EntitySoundPacket(event.getPacket().getEntityUuid(), rawAudio,  event.getPacket().isWhispering(), event.getPacket().getDistance()));
++        EntitySoundPacket ssp = (EntitySoundPacket)event.getPacket();
++        send(new EntitySoundPacket(event.getPacket().getEntityUuid(), ssp.getRawAudio(),  event.getPacket().isWhispering(), event.getPacket().getDistance()));
+     }
+ 
+     public static void onLocationalSound(LocationalSoundPacketEvent event) {
+-        short[] rawAudio = getRawAudio(event, event.getPacket());
+-        send(new LocationalSoundPacket(event.getPacket().getSender(), rawAudio, event.getPacket().getPosition(), event.getPacket().getDistance()));
++        LocationalSoundPacket ssp = (LocationalSoundPacket)event.getPacket();
++        send(new LocationalSoundPacket(event.getPacket().getSender(), ssp.getRawAudio(), event.getPacket().getPosition(), event.getPacket().getDistance()));
+     }
+ 
+     public static void onStaticSound(StaticSoundPacketEvent event) {
+-        short[] rawAudio = getRawAudio(event, event.getPacket());
+-        send(new StaticSoundPacket(event.getPacket().getSender(), rawAudio));
++        StaticSoundPacket ssp = (StaticSoundPacket)event.getPacket();
++        send(new StaticSoundPacket(event.getPacket().getSender(), ssp.getRawAudio()));
+     }
+ 
+-    public static short[] getRawAudio(SoundPacketEvent<?> event, SoundPacket packet){
+-        OpusDecoder decoder = event.getVoicechat().createDecoder();
++    public static void onSound(MicrophonePacketEvent event) {
++        UUID id = event.getSenderConnection().getPlayer().getUuid();
+ 
+-        byte[] opusData = packet.getOpusEncodedData();
+-        return decoder.decode(opusData);
+-    }
++        OpusDecoder decoder = ServerSideVoiceChat.decoder;
++        byte[] opusData = event.getPacket().getOpusEncodedData();
++
++        short[] rawAudio = decoder.decode(opusData);
+ 
+-//    public static void onSound(ClientSoundEvent event) {
+-//        UUID id = ClientManager.getPlayerStateManager().getOwnID();
+-//        short[] rawAudio = event.getRawAudio();
+-//
+-//        if (ReplayVoicechatPlugin.CLIENT_API.getGroup() != null) {
+-//            send(new StaticSoundPacket(id, rawAudio));
+-//        } else {
+-//            send(new EntitySoundPacket(id, rawAudio, event.isWhispering(), (float) ReplayVoicechatPlugin.CLIENT_API.getVoiceChatDistance()));
+-//        }
+-//    }
++        if (event.getSenderConnection().getGroup() != null) {
++            send(new StaticSoundPacket(id, rawAudio));
++        } else {
++            send(new EntitySoundPacket(id, rawAudio, event.getPacket().isWhispering(), (float) ServerSideVoiceChat.distance));
++        }
++    }
+ 
+     public static void send(Packet<?> packet) {
+         FriendlyByteBuf buf = new FriendlyByteBuf(Unpooled.buffer());
+         packet.toBytes(buf);
+         ClientboundCustomPayloadPacket fakeP = new ClientboundCustomPayloadPacket(packet.getIdentifier(), buf);
+         for (ReplayRecorder recorder : ReplayRecorder.active_recorders){
+-            recorder.onPacket(fakeP);
++            recorder.save(fakeP);
+         }
+-       // ReplayInterface.INSTANCE.sendFakePacket(packet.getIdentifier(), buf);
+     }
+ 
+ }

@@ -1,0 +1,19 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Bryan1029384756 <23323626+Bryan1029384756@users.noreply.github.com>
+Date: Mon, 19 Jun 2023 18:37:49 -0500
+Subject: [PATCH] ServerSideRecorder
+
+
+diff --git a/src/main/java/net/minecraft/serversidereplayrecorder/command/ReplayCommand.java b/src/main/java/net/minecraft/serversidereplayrecorder/command/ReplayCommand.java
+index 50634cba3a60eea3d8474c88e8a34f1c97c8fdf0..d598a7901459fef7334025ca83758b8df0d0c99d 100644
+--- a/src/main/java/net/minecraft/serversidereplayrecorder/command/ReplayCommand.java
++++ b/src/main/java/net/minecraft/serversidereplayrecorder/command/ReplayCommand.java
+@@ -180,7 +180,7 @@ public class ReplayCommand {
+                                                     });
+                                                     if (count.get() > 0) {
+                                                         source.sendSuccess(()->Component.literal("Added players will start recording next time they join the server"), true);
+-                                                        //ServerSideReplayRecorderServer.saveConfig();
++                                                        ServerSideReplayRecorderServer.saveConfig();
+                                                     }
+                                                     return 0;
+                                                 })

@@ -39,19 +39,19 @@ jobs:
       - name: Create Release Tag
         uses: rickstaa/action-create-tag@v1
         with:
-          tag: "e8bec64"
-          message: "1.20.1 Paper_Upstream Build ${{ env.Compile_Date }}"
+          tag: "v1_20_1-${{ env.Compile_Date }}"
+          message: "1.20.1 Build ${{ env.Compile_Date }}"
       - name: Upload Build to Release
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: build/libs/*
           file_glob: true
-          tag: "e8bec64"
-          release_name: "1.20.1_PaperRecord-Paper_Upstream-${{ env.Compile_Date }}"
+          tag: "v1_20_1-${{ env.Compile_Date }}"
+          release_name: "1.20.1_PaperRecord-${{ env.Compile_Date }}"
           overwrite: true
-          prerelease: true
+          prerelease: false
           body: |
-            PaperRecord_Paper_Upstream Build
+            PaperRecord Build
             Version: 1.20.1
             Build Time: ${{ env.Compile_Date }}

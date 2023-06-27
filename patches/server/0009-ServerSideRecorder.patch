@@ -5,7 +5,7 @@ Subject: [PATCH] ServerSideRecorder
 
 
 diff --git a/build.gradle.kts b/build.gradle.kts
-index 4fa7dd3f6f0bb814f2f561d96b035f325a98d263..20215b51b6253a66d7f036bcd4c03d8415bd1b41 100644
+index 1e6743e1ac5cfc7f5fbd5a40ead0ca519dac74c9..bc657aeac475dfc5a55e5d91939d5e8318b0c12f 100644
 --- a/build.gradle.kts
 +++ b/build.gradle.kts
 @@ -35,7 +35,8 @@ dependencies {
@@ -19,7 +19,7 @@ index 4fa7dd3f6f0bb814f2f561d96b035f325a98d263..20215b51b6253a66d7f036bcd4c03d84
      runtimeOnly("com.mysql:mysql-connector-j:8.0.33")
      runtimeOnly("com.lmax:disruptor:3.4.4") // Paper
 diff --git a/src/main/java/net/minecraft/server/MinecraftServer.java b/src/main/java/net/minecraft/server/MinecraftServer.java
-index 38b5d52f1dc3c5e7d2a546bcd0799243a90ba9a2..60e7db0d4a5c053e94d22990aac3b9617f6df269 100644
+index a6fded634d1545611337ee39b6dcde655b0b6b82..c301cc293a93c45c3955932ff6bb445bcd32842a 100644
 --- a/src/main/java/net/minecraft/server/MinecraftServer.java
 +++ b/src/main/java/net/minecraft/server/MinecraftServer.java
 @@ -1114,6 +1114,7 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
@@ -47,7 +47,7 @@ index 8a2fae854e07482fd5cd372ab12571618fdbeacb..024b9474ee5cbd887c2604d344138cb4
  
          // Paper start - use distance map to optimise tracker
 diff --git a/src/main/java/net/minecraft/server/players/PlayerList.java b/src/main/java/net/minecraft/server/players/PlayerList.java
-index 7c410323a7af92a89dd5a679e6bab160862f5db0..47a1d4a57e0be0f870f1040a9d8d463413198dfb 100644
+index f13581964ac8399a1d1acf651a9856d0e6502766..64b5b0948d6b9f31c973c706f98c08fe3496957b 100644
 --- a/src/main/java/net/minecraft/server/players/PlayerList.java
 +++ b/src/main/java/net/minecraft/server/players/PlayerList.java
 @@ -177,8 +177,11 @@ public abstract class PlayerList {

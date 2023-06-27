@@ -5,7 +5,7 @@ Subject: [PATCH] ServerSideRecorder
 
 
 diff --git a/src/main/java/net/minecraft/server/players/PlayerList.java b/src/main/java/net/minecraft/server/players/PlayerList.java
-index 541a27beec10e3aef65be64dfa797a931d3650a1..a8f3a89697e7f6930ae8a20155c192b4643c38b4 100644
+index 1aa50493969f2fb841274ba24a30409812daf07d..8c54cf82a5bfccfb28cf73797dff5c595caf6404 100644
 --- a/src/main/java/net/minecraft/server/players/PlayerList.java
 +++ b/src/main/java/net/minecraft/server/players/PlayerList.java
 @@ -171,9 +171,9 @@ public abstract class PlayerList {

@@ -5,7 +5,7 @@ Subject: [PATCH] ServerSideRecorder
 
 
 diff --git a/src/main/java/net/minecraft/network/Connection.java b/src/main/java/net/minecraft/network/Connection.java
-index 207c4f65d20c5985c2e109b6e096a87f57eced81..4ad51b60ec083ffb1d66f323390d45dcb8d599ca 100644
+index b972534be2e59a2f0759100537746889fb657c82..6f7cbd65c8e6f539ba5228401549390b191f9c83 100644
 --- a/src/main/java/net/minecraft/network/Connection.java
 +++ b/src/main/java/net/minecraft/network/Connection.java
 @@ -54,7 +54,7 @@ import org.slf4j.Logger;
@@ -41,7 +41,7 @@ index 207c4f65d20c5985c2e109b6e096a87f57eced81..4ad51b60ec083ffb1d66f323390d45dc
  
      // Spigot Start
      public java.util.UUID spoofedUUID;
-@@ -435,17 +418,6 @@ public class Connection extends SimpleChannelInboundHandler<Packet<?>> implement
+@@ -438,17 +421,6 @@ public class Connection extends SimpleChannelInboundHandler<Packet<?>> implement
          }
          this.flushQueue();
          // Paper end
@@ -60,7 +60,7 @@ index 207c4f65d20c5985c2e109b6e096a87f57eced81..4ad51b60ec083ffb1d66f323390d45dc
  
      private void sendPacket(Packet<?> packet, @Nullable PacketSendListener callbacks) {
 diff --git a/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java b/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java
-index e4ebc83cf1543c301b440567f08d962b729354e3..ed728b30e91a6fe334dd53330a98225e3459d113 100644
+index 63502534ec83643a9778d22d51b4ebc2a93d9e49..d1ff154b6bba9b4233d0b989c26ec3730f3b6961 100644
 --- a/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java
 +++ b/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java
 @@ -9,6 +9,8 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectMap.Entry;
@@ -125,7 +125,7 @@ index e4ebc83cf1543c301b440567f08d962b729354e3..ed728b30e91a6fe334dd53330a98225e
      private final org.bukkit.craftbukkit.CraftServer cserver;
      public boolean processedDisconnect;
      private int lastTick = MinecraftServer.currentTick;
-@@ -2101,9 +2131,10 @@ public class ServerGamePacketListenerImpl implements ServerPlayerConnection, Tic
+@@ -2102,9 +2132,10 @@ public class ServerGamePacketListenerImpl implements ServerPlayerConnection, Tic
      public void onDisconnect(Component reason) {
          //ServersideRecorder start
          if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("ServerGamePacketListenerImpl.disconnect: disconnected");
@@ -138,7 +138,7 @@ index e4ebc83cf1543c301b440567f08d962b729354e3..ed728b30e91a6fe334dd53330a98225e
          }else{
              if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("ServerGamePacketListenerImpl.disconnect: getRecorder null");
          }
-@@ -2112,6 +2143,12 @@ public class ServerGamePacketListenerImpl implements ServerPlayerConnection, Tic
+@@ -2113,6 +2144,12 @@ public class ServerGamePacketListenerImpl implements ServerPlayerConnection, Tic
          this.onDisconnect(reason, null);
      }
      public void onDisconnect(Component reason, @Nullable net.kyori.adventure.text.Component quitMessage) {
@@ -151,7 +151,7 @@ index e4ebc83cf1543c301b440567f08d962b729354e3..ed728b30e91a6fe334dd53330a98225e
          // Paper end
          // CraftBukkit start - Rarely it would send a disconnect line twice
          if (this.processedDisconnect) {
-@@ -2179,6 +2216,17 @@ public class ServerGamePacketListenerImpl implements ServerPlayerConnection, Tic
+@@ -2180,6 +2217,17 @@ public class ServerGamePacketListenerImpl implements ServerPlayerConnection, Tic
              });
              throw new ReportedException(crashreport);
          }

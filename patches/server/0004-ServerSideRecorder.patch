@@ -5,7 +5,7 @@ Subject: [PATCH] ServerSideRecorder
 
 
 diff --git a/src/main/java/net/minecraft/network/Connection.java b/src/main/java/net/minecraft/network/Connection.java
-index 1b634b303105a0f8424e1e40b7c39f9938232d95..20acfea9b60c02ca0b3f5d28ff5c8a2e84f97c23 100644
+index cf20f0983fc25b26cf92b9d3a28746b1909fc56b..b25eef60573cb217ac2a288ab7dd9e502e39e247 100644
 --- a/src/main/java/net/minecraft/network/Connection.java
 +++ b/src/main/java/net/minecraft/network/Connection.java
 @@ -26,6 +26,8 @@ import io.netty.channel.socket.nio.NioSocketChannel;
@@ -62,7 +62,7 @@ index 1b634b303105a0f8424e1e40b7c39f9938232d95..20acfea9b60c02ca0b3f5d28ff5c8a2e
      // Spigot Start
      public java.util.UUID spoofedUUID;
      public com.mojang.authlib.properties.Property[] spoofedProfile;
-@@ -407,6 +431,11 @@ public class Connection extends SimpleChannelInboundHandler<Packet<?>> {
+@@ -410,6 +434,11 @@ public class Connection extends SimpleChannelInboundHandler<Packet<?>> {
          }
          this.flushQueue();
          // Paper end
@@ -74,7 +74,7 @@ index 1b634b303105a0f8424e1e40b7c39f9938232d95..20acfea9b60c02ca0b3f5d28ff5c8a2e
      }
  
      private void sendPacket(Packet<?> packet, @Nullable PacketSendListener callbacks) {
-@@ -804,6 +833,11 @@ public class Connection extends SimpleChannelInboundHandler<Packet<?>> {
+@@ -807,6 +836,11 @@ public class Connection extends SimpleChannelInboundHandler<Packet<?>> {
      }
  
      public void handleDisconnection() {
@@ -124,7 +124,7 @@ index b7a1cbc2d15c6a0e6b7c95c4776a56b8820aab9f..3120a7b88378b2a08f2a2b6f1f64b012
 +    }
  }
 diff --git a/src/main/java/net/minecraft/server/MinecraftServer.java b/src/main/java/net/minecraft/server/MinecraftServer.java
-index 5af80eb3959382abf31d273e2069ed558c478716..bbad3aee3fe5c20abc8c96baff78b0e2f07abf0e 100644
+index 8f5784552f824843e59e8750f120004827150636..37610964e6057709b4d0fb82e36d3943d50b45b1 100644
 --- a/src/main/java/net/minecraft/server/MinecraftServer.java
 +++ b/src/main/java/net/minecraft/server/MinecraftServer.java
 @@ -101,6 +101,8 @@ import net.minecraft.server.players.GameProfileCache;
@@ -603,7 +603,7 @@ index 63cf71940f6480c593a43bd39900c50676367404..1b6683f3ce3e7671284045eca73cea00
          this.connection = connection;
      }
 diff --git a/src/main/java/net/minecraft/server/players/PlayerList.java b/src/main/java/net/minecraft/server/players/PlayerList.java
-index 8547e7ff2f1f5b7701fb0f3c3010c14601a5f83e..134b4ce9bec37f71cec4046ed091a0fc4decaba6 100644
+index fff7ad7a45f310783ac96b44575ad3db13d537fa..b0c7f13cf93108349dabdd378e38ff001fc92e7c 100644
 --- a/src/main/java/net/minecraft/server/players/PlayerList.java
 +++ b/src/main/java/net/minecraft/server/players/PlayerList.java
 @@ -11,6 +11,7 @@ import com.mojang.serialization.Dynamic;
@@ -684,7 +684,7 @@ index 8547e7ff2f1f5b7701fb0f3c3010c14601a5f83e..134b4ce9bec37f71cec4046ed091a0fc
          player.isRealPlayer = true; // Paper
          player.loginTime = System.currentTimeMillis(); // Paper
          GameProfile gameprofile = player.getGameProfile();
-@@ -1007,6 +1004,8 @@ public abstract class PlayerList {
+@@ -1008,6 +1005,8 @@ public abstract class PlayerList {
      }
  
      public void broadcastAll(Packet<?> packet) {
@@ -693,7 +693,7 @@ index 8547e7ff2f1f5b7701fb0f3c3010c14601a5f83e..134b4ce9bec37f71cec4046ed091a0fc
          Iterator iterator = this.players.iterator();
  
          while (iterator.hasNext()) {
-@@ -1037,6 +1036,8 @@ public abstract class PlayerList {
+@@ -1038,6 +1037,8 @@ public abstract class PlayerList {
      // CraftBukkit end
  
      public void broadcastAll(Packet<?> packet, ResourceKey<Level> dimension) {
@@ -702,7 +702,7 @@ index 8547e7ff2f1f5b7701fb0f3c3010c14601a5f83e..134b4ce9bec37f71cec4046ed091a0fc
          Iterator iterator = this.players.iterator();
  
          while (iterator.hasNext()) {
-@@ -1069,6 +1070,14 @@ public abstract class PlayerList {
+@@ -1070,6 +1071,14 @@ public abstract class PlayerList {
      }
  
      public void broadcastSystemToAllExceptTeam(net.minecraft.world.entity.player.Player source, Component message) {
@@ -717,7 +717,7 @@ index 8547e7ff2f1f5b7701fb0f3c3010c14601a5f83e..134b4ce9bec37f71cec4046ed091a0fc
          Team scoreboardteambase = source.getTeam();
  
          if (scoreboardteambase == null) {
-@@ -1179,6 +1188,20 @@ public abstract class PlayerList {
+@@ -1180,6 +1189,20 @@ public abstract class PlayerList {
      }
  
      public void broadcast(@Nullable net.minecraft.world.entity.player.Player player, double x, double y, double z, double distance, ResourceKey<Level> worldKey, Packet<?> packet) {
@@ -738,7 +738,7 @@ index 8547e7ff2f1f5b7701fb0f3c3010c14601a5f83e..134b4ce9bec37f71cec4046ed091a0fc
          for (int i = 0; i < this.players.size(); ++i) {
              ServerPlayer entityplayer = (ServerPlayer) this.players.get(i);
  
-@@ -1358,12 +1381,20 @@ public abstract class PlayerList {
+@@ -1359,12 +1382,20 @@ public abstract class PlayerList {
      // CraftBukkit end
  
      public void broadcastSystemMessage(Component message, boolean overlay) {

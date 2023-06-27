@@ -5,7 +5,7 @@ Subject: [PATCH] ServerSideRecorder
 
 
 diff --git a/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java b/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java
-index bdde12d6b92e0f5c132f283062819d52efd2b3b7..e4ebc83cf1543c301b440567f08d962b729354e3 100644
+index f3bc5eb88fdd93fbe7fc914c43f20217cd591d98..63502534ec83643a9778d22d51b4ebc2a93d9e49 100644
 --- a/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java
 +++ b/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java
 @@ -485,13 +485,6 @@ public class ServerGamePacketListenerImpl implements ServerPlayerConnection, Tic
@@ -22,7 +22,7 @@ index bdde12d6b92e0f5c132f283062819d52efd2b3b7..e4ebc83cf1543c301b440567f08d962b
  
          // Paper end
          // CraftBukkit start - fire PlayerKickEvent
-@@ -2106,6 +2099,15 @@ public class ServerGamePacketListenerImpl implements ServerPlayerConnection, Tic
+@@ -2107,6 +2100,15 @@ public class ServerGamePacketListenerImpl implements ServerPlayerConnection, Tic
  
      @Override
      public void onDisconnect(Component reason) {

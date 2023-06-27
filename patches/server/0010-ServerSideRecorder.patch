@@ -5,7 +5,7 @@ Subject: [PATCH] ServerSideRecorder
 
 
 diff --git a/src/main/java/net/minecraft/network/Connection.java b/src/main/java/net/minecraft/network/Connection.java
-index f33001bcf5e807eda9e66d9c601c5a98c6ce9ae4..6938fa3763783c6e12d23b1c7c74f4ff6688de03 100644
+index f56d50a9936ee72ebb74175520d5a08e55bbded6..1bd7c0404d4252ee1bc4f2fbd42b4756e22752e2 100644
 --- a/src/main/java/net/minecraft/network/Connection.java
 +++ b/src/main/java/net/minecraft/network/Connection.java
 @@ -42,7 +42,9 @@ import net.minecraft.network.protocol.Packet;
@@ -32,7 +32,7 @@ index f33001bcf5e807eda9e66d9c601c5a98c6ce9ae4..6938fa3763783c6e12d23b1c7c74f4ff
          return this.recorder.get();
      }
      //Serversiderecorder end
-@@ -433,9 +437,13 @@ public class Connection extends SimpleChannelInboundHandler<Packet<?>> implement
+@@ -436,9 +440,13 @@ public class Connection extends SimpleChannelInboundHandler<Packet<?>> implement
          // Paper end
  
          //Serversiderecorder start
@@ -46,7 +46,7 @@ index f33001bcf5e807eda9e66d9c601c5a98c6ce9ae4..6938fa3763783c6e12d23b1c7c74f4ff
          }
          //Serversiderecorder end
      }
-@@ -836,11 +844,16 @@ public class Connection extends SimpleChannelInboundHandler<Packet<?>> implement
+@@ -839,11 +847,16 @@ public class Connection extends SimpleChannelInboundHandler<Packet<?>> implement
  
      public void handleDisconnection() {
  
@@ -64,7 +64,7 @@ index f33001bcf5e807eda9e66d9c601c5a98c6ce9ae4..6938fa3763783c6e12d23b1c7c74f4ff
                  this.disconnectionHandled = true;
                  if (this.getDisconnectedReason() != null) {
                      this.getPacketListener().onDisconnect(this.getDisconnectedReason());
-@@ -868,6 +881,8 @@ public class Connection extends SimpleChannelInboundHandler<Packet<?>> implement
+@@ -871,6 +884,8 @@ public class Connection extends SimpleChannelInboundHandler<Packet<?>> implement
                      }
                  }
                  // Paper end
@@ -74,7 +74,7 @@ index f33001bcf5e807eda9e66d9c601c5a98c6ce9ae4..6938fa3763783c6e12d23b1c7c74f4ff
  
          }
 diff --git a/src/main/java/net/minecraft/server/MinecraftServer.java b/src/main/java/net/minecraft/server/MinecraftServer.java
-index 60e7db0d4a5c053e94d22990aac3b9617f6df269..897a4cbeef30250e4272d28db69c87d23dab3803 100644
+index c301cc293a93c45c3955932ff6bb445bcd32842a..6283393eb01f8fb0686ab21c65ff5fe307459ad5 100644
 --- a/src/main/java/net/minecraft/server/MinecraftServer.java
 +++ b/src/main/java/net/minecraft/server/MinecraftServer.java
 @@ -915,6 +915,7 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
@@ -254,7 +254,7 @@ index 9e6602565e95b0f614f126dcd860a9b4b5492940..92f3b7805a7d630470cd1916d925db3b
              r -> r.onPacket(new ClientboundExplodePacket(x, y, z, power, explosion.getToBlow(), Vec3.ZERO))
          );
 diff --git a/src/main/java/net/minecraft/server/players/PlayerList.java b/src/main/java/net/minecraft/server/players/PlayerList.java
-index 47a1d4a57e0be0f870f1040a9d8d463413198dfb..5ca1812dd3981b1890e89205fbed19d5c99d622f 100644
+index 64b5b0948d6b9f31c973c706f98c08fe3496957b..99b9015aa628ea2434f2a9b697565f6f3524cf4c 100644
 --- a/src/main/java/net/minecraft/server/players/PlayerList.java
 +++ b/src/main/java/net/minecraft/server/players/PlayerList.java
 @@ -171,22 +171,22 @@ public abstract class PlayerList {
@@ -287,7 +287,7 @@ index 47a1d4a57e0be0f870f1040a9d8d463413198dfb..5ca1812dd3981b1890e89205fbed19d5
          //ServerSideReplayRecorder end
  
          player.isRealPlayer = true; // Paper
-@@ -1007,6 +1007,7 @@ public abstract class PlayerList {
+@@ -1008,6 +1008,7 @@ public abstract class PlayerList {
      }
  
      public void broadcastAll(Packet<?> packet) {
@@ -295,7 +295,7 @@ index 47a1d4a57e0be0f870f1040a9d8d463413198dfb..5ca1812dd3981b1890e89205fbed19d5
          RegionRecorder.regionRecorderMap.values().forEach(r -> r.onPacket(packet)); //Serversiderecorder
  
          Iterator iterator = this.players.iterator();
-@@ -1039,6 +1040,7 @@ public abstract class PlayerList {
+@@ -1040,6 +1041,7 @@ public abstract class PlayerList {
      // CraftBukkit end
  
      public void broadcastAll(Packet<?> packet, ResourceKey<Level> dimension) {
@@ -303,7 +303,7 @@ index 47a1d4a57e0be0f870f1040a9d8d463413198dfb..5ca1812dd3981b1890e89205fbed19d5
          RegionRecorder.regionRecorderMap.values().stream().filter(r -> r.world.registryAccess().equals(dimension)).forEach(r -> r.onPacket(packet)); //Serversiderecorder
  
          Iterator iterator = this.players.iterator();
-@@ -1194,9 +1196,13 @@ public abstract class PlayerList {
+@@ -1195,9 +1197,13 @@ public abstract class PlayerList {
          //Serversiderecorder start
  
          if (player != null) {

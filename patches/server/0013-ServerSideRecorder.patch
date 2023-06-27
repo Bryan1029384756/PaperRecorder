@@ -5,10 +5,10 @@ Subject: [PATCH] ServerSideRecorder
 
 
 diff --git a/src/main/java/net/minecraft/network/Connection.java b/src/main/java/net/minecraft/network/Connection.java
-index 6938fa3763783c6e12d23b1c7c74f4ff6688de03..207c4f65d20c5985c2e109b6e096a87f57eced81 100644
+index 1bd7c0404d4252ee1bc4f2fbd42b4756e22752e2..b972534be2e59a2f0759100537746889fb657c82 100644
 --- a/src/main/java/net/minecraft/network/Connection.java
 +++ b/src/main/java/net/minecraft/network/Connection.java
-@@ -848,12 +848,7 @@ public class Connection extends SimpleChannelInboundHandler<Packet<?>> implement
+@@ -851,12 +851,7 @@ public class Connection extends SimpleChannelInboundHandler<Packet<?>> implement
              if (this.disconnectionHandled) {
                  //Connection.LOGGER.warn("handleDisconnection() called twice"); // Paper - Do not log useless message
              } else {
@@ -23,7 +23,7 @@ index 6938fa3763783c6e12d23b1c7c74f4ff6688de03..207c4f65d20c5985c2e109b6e096a87f
                  if (this.getDisconnectedReason() != null) {
                      this.getPacketListener().onDisconnect(this.getDisconnectedReason());
 diff --git a/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java b/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java
-index d9c2d06ae24dcf80a497e75f4c7f63d401b77f9b..706fa43dc3534c0ca10bc96dc33bbfb9736b3c95 100644
+index 2a609e43370e68943c580083f7f7d8c9b0972955..63cf2c1fa0dc5af7d15198fbdb5a7b0b959174e0 100644
 --- a/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java
 +++ b/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java
 @@ -135,6 +135,7 @@ import net.minecraft.resources.ResourceLocation;

@@ -5,10 +5,10 @@ Subject: [PATCH] ServerSideRecorder
 
 
 diff --git a/src/main/java/net/minecraft/network/Connection.java b/src/main/java/net/minecraft/network/Connection.java
-index 20acfea9b60c02ca0b3f5d28ff5c8a2e84f97c23..f33001bcf5e807eda9e66d9c601c5a98c6ce9ae4 100644
+index b25eef60573cb217ac2a288ab7dd9e502e39e247..f56d50a9936ee72ebb74175520d5a08e55bbded6 100644
 --- a/src/main/java/net/minecraft/network/Connection.java
 +++ b/src/main/java/net/minecraft/network/Connection.java
-@@ -432,10 +432,12 @@ public class Connection extends SimpleChannelInboundHandler<Packet<?>> implement
+@@ -435,10 +435,12 @@ public class Connection extends SimpleChannelInboundHandler<Packet<?>> implement
          this.flushQueue();
          // Paper end
  
@@ -21,7 +21,7 @@ index 20acfea9b60c02ca0b3f5d28ff5c8a2e84f97c23..f33001bcf5e807eda9e66d9c601c5a98
      }
  
      private void sendPacket(Packet<?> packet, @Nullable PacketSendListener callbacks) {
-@@ -833,10 +835,7 @@ public class Connection extends SimpleChannelInboundHandler<Packet<?>> implement
+@@ -836,10 +838,7 @@ public class Connection extends SimpleChannelInboundHandler<Packet<?>> implement
      }
  
      public void handleDisconnection() {
@@ -34,7 +34,7 @@ index 20acfea9b60c02ca0b3f5d28ff5c8a2e84f97c23..f33001bcf5e807eda9e66d9c601c5a98
          if (this.channel != null && !this.channel.isOpen()) {
              if (this.disconnectionHandled) {
 diff --git a/src/main/java/net/minecraft/server/MinecraftServer.java b/src/main/java/net/minecraft/server/MinecraftServer.java
-index bbad3aee3fe5c20abc8c96baff78b0e2f07abf0e..38b5d52f1dc3c5e7d2a546bcd0799243a90ba9a2 100644
+index 37610964e6057709b4d0fb82e36d3943d50b45b1..a6fded634d1545611337ee39b6dcde655b0b6b82 100644
 --- a/src/main/java/net/minecraft/server/MinecraftServer.java
 +++ b/src/main/java/net/minecraft/server/MinecraftServer.java
 @@ -1114,6 +1114,7 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa

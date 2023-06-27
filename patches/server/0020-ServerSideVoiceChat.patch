@@ -5,7 +5,7 @@ Subject: [PATCH] ServerSideVoiceChat
 
 
 diff --git a/build.gradle.kts b/build.gradle.kts
-index 20215b51b6253a66d7f036bcd4c03d8415bd1b41..8084a218b28f10605da10dcda77a4bfc6704ce19 100644
+index bc657aeac475dfc5a55e5d91939d5e8318b0c12f..f3b7534eef9fb551146b380e2ba62b1d8ea53aac 100644
 --- a/build.gradle.kts
 +++ b/build.gradle.kts
 @@ -37,6 +37,7 @@ dependencies {
@@ -17,7 +17,7 @@ index 20215b51b6253a66d7f036bcd4c03d8415bd1b41..8084a218b28f10605da10dcda77a4bfc
      runtimeOnly("com.mysql:mysql-connector-j:8.0.33")
      runtimeOnly("com.lmax:disruptor:3.4.4") // Paper
 diff --git a/src/main/java/net/minecraft/server/MinecraftServer.java b/src/main/java/net/minecraft/server/MinecraftServer.java
-index 897a4cbeef30250e4272d28db69c87d23dab3803..db8ea15777d0fcf84659352090c660a293d1a1d2 100644
+index 6283393eb01f8fb0686ab21c65ff5fe307459ad5..c3586d6dc0168c0da3d8b229a47118bfc907d2a0 100644
 --- a/src/main/java/net/minecraft/server/MinecraftServer.java
 +++ b/src/main/java/net/minecraft/server/MinecraftServer.java
 @@ -14,6 +14,7 @@ import com.mojang.authlib.GameProfileRepository;
@@ -106,10 +106,10 @@ index 897a4cbeef30250e4272d28db69c87d23dab3803..db8ea15777d0fcf84659352090c660a2
          // CraftBukkit start - prevent double stopping on multiple threads
          synchronized(this.stopLock) {
 diff --git a/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java b/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java
-index ed728b30e91a6fe334dd53330a98225e3459d113..98f2883a6de1cdc7ddba12872521a86c2a2979da 100644
+index d1ff154b6bba9b4233d0b989c26ec3730f3b6961..d378b0fc28d2f3a5ef5fa558f442ae93c8a2afb9 100644
 --- a/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java
 +++ b/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java
-@@ -2138,6 +2138,7 @@ public class ServerGamePacketListenerImpl implements ServerPlayerConnection, Tic
+@@ -2139,6 +2139,7 @@ public class ServerGamePacketListenerImpl implements ServerPlayerConnection, Tic
          }else{
              if (ServerSideReplayRecorderServer.config.isDebug()) MinecraftServer.LOGGER.info("ServerGamePacketListenerImpl.disconnect: getRecorder null");
          }
@@ -118,7 +118,7 @@ index ed728b30e91a6fe334dd53330a98225e3459d113..98f2883a6de1cdc7ddba12872521a86c
          // Paper start
          this.onDisconnect(reason, null);
 diff --git a/src/main/java/net/minecraft/server/players/PlayerList.java b/src/main/java/net/minecraft/server/players/PlayerList.java
-index a8f3a89697e7f6930ae8a20155c192b4643c38b4..0f4290bf29aa994458f9d8174c8c22e80a70e8d5 100644
+index 8c54cf82a5bfccfb28cf73797dff5c595caf6404..e5e474a68e7b5c8f18724f3455a24ae3a8049440 100644
 --- a/src/main/java/net/minecraft/server/players/PlayerList.java
 +++ b/src/main/java/net/minecraft/server/players/PlayerList.java
 @@ -59,6 +59,7 @@ import net.minecraft.serversidereplayrecorder.recorder.PlayerRecorder;

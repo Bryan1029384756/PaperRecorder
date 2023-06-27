@@ -48,7 +48,7 @@ index 6670e657e08e130f7e0368f418379fd1ece00cdf..27edf4a0eb3caed5923fd1187c4da147
              if (!collection.isEmpty()) {
                  sender.accept(new ClientboundUpdateAttributesPacket(this.entity.getId(), collection));
 diff --git a/src/main/java/net/minecraft/server/players/PlayerList.java b/src/main/java/net/minecraft/server/players/PlayerList.java
-index 134b4ce9bec37f71cec4046ed091a0fc4decaba6..36f6aef11f3c08ab544083d29b7253da696945b6 100644
+index b0c7f13cf93108349dabdd378e38ff001fc92e7c..1a79374bb771b20309fb087703bfe278d90ed71d 100644
 --- a/src/main/java/net/minecraft/server/players/PlayerList.java
 +++ b/src/main/java/net/minecraft/server/players/PlayerList.java
 @@ -171,8 +171,8 @@ public abstract class PlayerList {

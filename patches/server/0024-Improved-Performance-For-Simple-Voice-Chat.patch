@@ -1,0 +1,18 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Bryan1029384756 <23323626+Bryan1029384756@users.noreply.github.com>
+Date: Mon, 26 Jun 2023 20:35:55 -0500
+Subject: [PATCH] Improved Performance For Simple Voice Chat
+
+
+diff --git a/src/main/java/net/minecraft/server/players/PlayerList.java b/src/main/java/net/minecraft/server/players/PlayerList.java
+index e5e474a68e7b5c8f18724f3455a24ae3a8049440..ddc0f9e5ddcd91cfe4f54c62ebb7a9b4d2bc01ab 100644
+--- a/src/main/java/net/minecraft/server/players/PlayerList.java
++++ b/src/main/java/net/minecraft/server/players/PlayerList.java
+@@ -182,7 +182,6 @@ public abstract class PlayerList {
+ 
+                 this.getPlayers().stream().filter(p -> this.isOp(p.getGameProfile())).forEach( p -> p.displayClientMessage(Component.literal("Started Recording Player %s".formatted(player.getGameProfile().getName())), false));
+ 
+-                voiceChat.startSound(player);
+                 PlayerRecorder recorder = new PlayerRecorder(connection);
+                 PlayerRecorder.playerRecorderMap.put(connection, recorder);
+                 recorder.onPacket(new ClientboundGameProfilePacket(player.getGameProfile()));

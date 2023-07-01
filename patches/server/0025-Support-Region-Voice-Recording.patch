@@ -1,0 +1,323 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Bryan1029384756 <23323626+Bryan1029384756@users.noreply.github.com>
+Date: Fri, 30 Jun 2023 20:41:08 -0500
+Subject: [PATCH] Support Region Voice Recording
+
+
+diff --git a/build.gradle.kts b/build.gradle.kts
+index f3b7534eef9fb551146b380e2ba62b1d8ea53aac..27b86c89e8ee3a3b503eef0f71fd9c39132d3f89 100644
+--- a/build.gradle.kts
++++ b/build.gradle.kts
+@@ -37,7 +37,8 @@ dependencies {
+     implementation("net.fabricmc:mapping-io:0.3.0") // Paper - needed to read mappings for stacktrace deobfuscation
+     implementation("com.fasterxml.jackson.core:jackson-annotations:2.15.2") //ServersideRecording
+     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.15.2") //ServersideRecording
+-    implementation("de.maxhenkel.voicechat:voicechat-api:2.4.11") //ServersideRecording
++    implementation ("de.maxhenkel.voicechat:voicechat-api:2.4.0")  //ServersideRecording
++    implementation ("maven.modrinth:simple-voice-chat:fabric-1.20.1-2.4.11")  //ServersideRecording
+     runtimeOnly("org.xerial:sqlite-jdbc:3.42.0.0")
+     runtimeOnly("com.mysql:mysql-connector-j:8.0.33")
+     runtimeOnly("com.lmax:disruptor:3.4.4") // Paper
+diff --git a/src/main/java/net/minecraft/serversidereplayrecorder/config/MainConfig.java b/src/main/java/net/minecraft/serversidereplayrecorder/config/MainConfig.java
+index 8e2d0ec530e408e572d1f0af38f6206e1fa94af7..788bd8f92f91a330b70f497c8f2dc93dc1864140 100644
+--- a/src/main/java/net/minecraft/serversidereplayrecorder/config/MainConfig.java
++++ b/src/main/java/net/minecraft/serversidereplayrecorder/config/MainConfig.java
+@@ -22,6 +22,8 @@ public class MainConfig {
+     private boolean assume_unloaded_chunks_dont_change = true;
+     private boolean render_distance_fog_fix = false;
+     private long  max_file_size = 10000000000L;
++    private int voice_recording_range = 48;
++    private boolean voice_recording_enabled = false;
+     private URL file_storage_url;
+     private boolean debug = false;
+ 
+@@ -48,6 +50,22 @@ public class MainConfig {
+         this.debug = debug;
+     }
+ 
++    public int getVoice_recording_range() {
++        return voice_recording_range;
++    }
++
++    public void setVoice_recording_range(int voice_recording_range) {
++        this.voice_recording_range = voice_recording_range;
++    }
++
++    public boolean isVoice_recording_enabled() {
++        return voice_recording_enabled;
++    }
++
++    public void setVoice_recording_enabled(boolean voice_recording_enabled) {
++        this.voice_recording_enabled = voice_recording_enabled;
++    }
++
+     public long getMax_file_size() {
+ 
+         return max_file_size;
+@@ -142,3 +160,4 @@ public class MainConfig {
+         this.render_distance_fog_fix = render_distance_fog_fix;
+     }
+ }
++
+diff --git a/src/main/java/net/minecraft/serversidereplayrecorder/recorder/RegionRecorder.java b/src/main/java/net/minecraft/serversidereplayrecorder/recorder/RegionRecorder.java
+index ffdbd36015553ca8d15d55803c945f8949f234f0..7312a60b1af9c66efa60a42e81256ee700c7623f 100644
+--- a/src/main/java/net/minecraft/serversidereplayrecorder/recorder/RegionRecorder.java
++++ b/src/main/java/net/minecraft/serversidereplayrecorder/recorder/RegionRecorder.java
+@@ -1,6 +1,7 @@
+ package net.minecraft.serversidereplayrecorder.recorder;
+ 
+ import com.mojang.authlib.GameProfile;
++import de.maxhenkel.voicechat.Voicechat;
+ import io.netty.buffer.Unpooled;
+ import net.minecraft.core.BlockPos;
+ import net.minecraft.core.NonNullList;
+@@ -11,12 +12,15 @@ import net.minecraft.network.protocol.Packet;
+ import net.minecraft.network.protocol.game.*;
+ import net.minecraft.network.protocol.login.ClientboundGameProfilePacket;
+ import net.minecraft.server.level.ServerLevel;
++import net.minecraft.server.level.ServerPlayer;
+ import net.minecraft.serversidereplayrecorder.ServerSideReplayRecorderServer;
+ import net.minecraft.serversidereplayrecorder.util.ChunkBox;
+ import net.minecraft.serversidereplayrecorder.util.WrappedPacket;
+ import net.minecraft.serversidereplayrecorder.util.interfaces.LightUpdatePacketAccessor;
+ import net.minecraft.serversidereplayrecorder.util.interfaces.RegionRecorderStorage;
+ import net.minecraft.serversidereplayrecorder.util.interfaces.RegionRecorderWorld;
++import net.minecraft.serversidereplayrecorder.voice.Utils;
++import net.minecraft.serversidereplayrecorder.voice.net.SecretPacket;
+ import net.minecraft.tags.TagNetworkSerialization;
+ import net.minecraft.world.entity.player.Abilities;
+ import net.minecraft.world.flag.FeatureFlags;
+@@ -214,6 +218,10 @@ public class RegionRecorder extends ReplayRecorder {
+         //set the replay viewpoint to the center of the watched region
+         onPacket(new ClientboundPlayerPositionPacket(viewpoint.getX() + 0.5d,viewpoint.getY(),viewpoint.getZ() + 0.5d,0f,0f, Collections.emptySet(),0));
+         //ready to record changes
++        if(ServerSideReplayRecorderServer.config.isVoice_recording_enabled()){
++            ServerPlayer player = new ServerPlayer(ms, ms.overworld(), FAKE_GAMEPROFILE);
++            onPacket(Utils.createCustomPacket(new SecretPacket(player, UUID.randomUUID() , Voicechat.SERVER.getServer().getPort(), Voicechat.SERVER_CONFIG)));
++        }
+     }
+ 
+     @Override
+diff --git a/src/main/java/net/minecraft/serversidereplayrecorder/voice/ServerSideVoiceChat.java b/src/main/java/net/minecraft/serversidereplayrecorder/voice/ServerSideVoiceChat.java
+index 3e84ce236b33963bd1bd6ac26f73885d9a9a9864..2afbfcb15a30988f3acb92af798819fa231b3022 100644
+--- a/src/main/java/net/minecraft/serversidereplayrecorder/voice/ServerSideVoiceChat.java
++++ b/src/main/java/net/minecraft/serversidereplayrecorder/voice/ServerSideVoiceChat.java
+@@ -4,6 +4,7 @@ import de.maxhenkel.voicechat.api.VoicechatApi;
+ import de.maxhenkel.voicechat.api.VoicechatPlugin;
+ import de.maxhenkel.voicechat.api.events.*;
+ import de.maxhenkel.voicechat.api.opus.OpusDecoder;
++import net.minecraft.serversidereplayrecorder.ServerSideReplayRecorderServer;
+ import net.minecraft.serversidereplayrecorder.voice.recording.VoicechatRecorder;
+ public class ServerSideVoiceChat implements VoicechatPlugin {
+ 
+@@ -17,6 +18,7 @@ public class ServerSideVoiceChat implements VoicechatPlugin {
+ 
+     @Override
+     public void initialize(VoicechatApi api) {
++        if(!ServerSideReplayRecorderServer.config.isVoice_recording_enabled()) return;
+         if (decoder == null) {
+             decoder = api.createDecoder();
+         }
+@@ -27,6 +29,7 @@ public class ServerSideVoiceChat implements VoicechatPlugin {
+ 
+     @Override
+     public void registerEvents(EventRegistration registration) {
++        if(!ServerSideReplayRecorderServer.config.isVoice_recording_enabled()) return;
+         registration.registerEvent(MicrophonePacketEvent.class, VoicechatRecorder::onSound);
+     }
+ 
+diff --git a/src/main/java/net/minecraft/serversidereplayrecorder/voice/Utils.java b/src/main/java/net/minecraft/serversidereplayrecorder/voice/Utils.java
+index 36132fcf9b14c52b9e81929172fea8277b28fbc8..99213f8a949ff5f145185c84e87766172b4cacd5 100644
+--- a/src/main/java/net/minecraft/serversidereplayrecorder/voice/Utils.java
++++ b/src/main/java/net/minecraft/serversidereplayrecorder/voice/Utils.java
+@@ -1,5 +1,10 @@
+ package net.minecraft.serversidereplayrecorder.voice;
+ 
++import io.netty.buffer.Unpooled;
++import net.minecraft.network.FriendlyByteBuf;
++import net.minecraft.network.protocol.game.ClientboundCustomPayloadPacket;
++import net.minecraft.serversidereplayrecorder.voice.net.Packet;
++
+ public class Utils {
+ 
+     public static short[] bytesToShorts(byte[] bytes) {
+@@ -31,4 +36,10 @@ public class Utils {
+         return new byte[]{(byte) (s & 0xFF), (byte) ((s >> 8) & 0xFF)};
+     }
+ 
++    public static ClientboundCustomPayloadPacket createCustomPacket(Packet<?> packet) {
++        FriendlyByteBuf buf = new FriendlyByteBuf(Unpooled.buffer());
++        packet.toBytes(buf);
++        return new ClientboundCustomPayloadPacket(packet.getIdentifier(), buf);
++    }
++
+ }
+diff --git a/src/main/java/net/minecraft/serversidereplayrecorder/voice/net/SecretPacket.java b/src/main/java/net/minecraft/serversidereplayrecorder/voice/net/SecretPacket.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..c24e8021e76582210caa9a64ce4d5c8cb92b4f92
+--- /dev/null
++++ b/src/main/java/net/minecraft/serversidereplayrecorder/voice/net/SecretPacket.java
+@@ -0,0 +1,109 @@
++package net.minecraft.serversidereplayrecorder.voice.net;
++
++import net.minecraft.network.FriendlyByteBuf;
++import net.minecraft.resources.ResourceLocation;
++import net.minecraft.server.level.ServerPlayer;
++import de.maxhenkel.voicechat.config.ServerConfig;
++import de.maxhenkel.voicechat.plugins.PluginManager;
++import java.util.UUID;
++
++public class SecretPacket implements Packet<SecretPacket> {
++    public static final ResourceLocation SECRET = new ResourceLocation("voicechat", "secret");
++    private UUID secret;
++    private int serverPort;
++    private UUID playerUUID;
++    private ServerConfig.Codec codec;
++    private int mtuSize;
++    private double voiceChatDistance;
++    private int keepAlive;
++    private boolean groupsEnabled;
++    private String voiceHost;
++    private boolean allowRecording;
++
++    public SecretPacket() {
++    }
++
++    public SecretPacket(ServerPlayer player, UUID secret, int port, ServerConfig serverConfig) {
++        this.secret = secret;
++        this.serverPort = port;
++        this.playerUUID = player.getUUID();
++        this.codec = (ServerConfig.Codec)serverConfig.voiceChatCodec.get();
++        this.mtuSize = (Integer)serverConfig.voiceChatMtuSize.get();
++        this.voiceChatDistance = (Double)serverConfig.voiceChatDistance.get();
++        this.keepAlive = (Integer)serverConfig.keepAlive.get();
++        this.groupsEnabled = (Boolean)serverConfig.groupsEnabled.get();
++        this.voiceHost = PluginManager.instance().getVoiceHost((String)serverConfig.voiceHost.get());
++        this.allowRecording = (Boolean)serverConfig.allowRecording.get();
++    }
++
++    public UUID getSecret() {
++        return this.secret;
++    }
++
++    public int getServerPort() {
++        return this.serverPort;
++    }
++
++    public UUID getPlayerUUID() {
++        return this.playerUUID;
++    }
++
++    public ServerConfig.Codec getCodec() {
++        return this.codec;
++    }
++
++    public int getMtuSize() {
++        return this.mtuSize;
++    }
++
++    public double getVoiceChatDistance() {
++        return this.voiceChatDistance;
++    }
++
++    public int getKeepAlive() {
++        return this.keepAlive;
++    }
++
++    public boolean groupsEnabled() {
++        return this.groupsEnabled;
++    }
++
++    public String getVoiceHost() {
++        return this.voiceHost;
++    }
++
++    public ResourceLocation getIdentifier() {
++        return SECRET;
++    }
++
++    public boolean allowRecording() {
++        return this.allowRecording;
++    }
++
++    public SecretPacket fromBytes(FriendlyByteBuf buf) {
++        this.secret = buf.readUUID();
++        this.serverPort = buf.readInt();
++        this.playerUUID = buf.readUUID();
++        this.codec = ServerConfig.Codec.values()[buf.readByte()];
++        this.mtuSize = buf.readInt();
++        this.voiceChatDistance = buf.readDouble();
++        this.keepAlive = buf.readInt();
++        this.groupsEnabled = buf.readBoolean();
++        this.voiceHost = buf.readUtf(32767);
++        this.allowRecording = buf.readBoolean();
++        return this;
++    }
++
++    public void toBytes(FriendlyByteBuf buf) {
++        buf.writeUUID(this.secret);
++        buf.writeInt(this.serverPort);
++        buf.writeUUID(this.playerUUID);
++        buf.writeByte(this.codec.ordinal());
++        buf.writeInt(this.mtuSize);
++        buf.writeDouble(this.voiceChatDistance);
++        buf.writeInt(this.keepAlive);
++        buf.writeBoolean(this.groupsEnabled);
++        buf.writeUtf(this.voiceHost);
++        buf.writeBoolean(this.allowRecording);
++    }
++}
+diff --git a/src/main/java/net/minecraft/serversidereplayrecorder/voice/recording/VoicechatRecorder.java b/src/main/java/net/minecraft/serversidereplayrecorder/voice/recording/VoicechatRecorder.java
+index 16d4d137726c97a170f951c879c1e0387019318a..7d29883f7c63747caaa6ce5eb92ccdac3f93f23a 100644
+--- a/src/main/java/net/minecraft/serversidereplayrecorder/voice/recording/VoicechatRecorder.java
++++ b/src/main/java/net/minecraft/serversidereplayrecorder/voice/recording/VoicechatRecorder.java
+@@ -17,6 +17,7 @@ import net.minecraft.serversidereplayrecorder.recorder.PlayerRecorder;
+ import net.minecraft.serversidereplayrecorder.recorder.RegionRecorder;
+ import net.minecraft.serversidereplayrecorder.recorder.ReplayRecorder;
+ import net.minecraft.serversidereplayrecorder.voice.ServerSideVoiceChat;
++import net.minecraft.serversidereplayrecorder.voice.Utils;
+ import net.minecraft.serversidereplayrecorder.voice.net.EntitySoundPacket;
+ import net.minecraft.serversidereplayrecorder.voice.net.LocationalSoundPacket;
+ import net.minecraft.serversidereplayrecorder.voice.net.Packet;
+@@ -38,11 +39,11 @@ public class VoicechatRecorder {
+         Collection<ServerPlayer> playersInRange = event.getVoicechat().getPlayersInRange(
+             level,
+             position,
+-            ServerSideReplayRecorderServer.server.getPlayerList().getViewDistance() * 16
++            ServerSideReplayRecorderServer.config.getVoice_recording_range()
+         );
+ 
+         sendNearbyPlayerPacket(playersInRange, packet);
+-        //sendRegionPacket(position, packet);
++        sendRegionPacket(position, packet);
+     }
+ 
+     private static Packet<?> createPacket(MicrophonePacketEvent event, UUID id) {
+@@ -72,13 +73,13 @@ public class VoicechatRecorder {
+     }
+ 
+     public static void sendPlayerPacket(PlayerRecorder recorder, Packet<?> packet) {
+-        ClientboundCustomPayloadPacket fakePacket = createCustomPacket(packet);
++        ClientboundCustomPayloadPacket fakePacket = Utils.createCustomPacket(packet);
+         recorder.onPacket(fakePacket);
+     }
+ 
+     public static void sendRegionPacket(Position pos, Packet<?> packet) {
+         Vec3 playerPos = new Vec3(pos.getX(), pos.getY(), pos.getZ());
+-        ClientboundCustomPayloadPacket fakePacket = createCustomPacket(packet);
++        ClientboundCustomPayloadPacket fakePacket = Utils.createCustomPacket(packet);
+ 
+         for(RegionRecorder recorder : RegionRecorder.regionRecorderMap.values()){
+             if(recorder.region.isInBox(playerPos)){
+@@ -87,10 +88,6 @@ public class VoicechatRecorder {
+         }
+     }
+ 
+-    private static ClientboundCustomPayloadPacket createCustomPacket(Packet<?> packet) {
+-        FriendlyByteBuf buf = new FriendlyByteBuf(Unpooled.buffer());
+-        packet.toBytes(buf);
+-        return new ClientboundCustomPayloadPacket(packet.getIdentifier(), buf);
+-    }
++
+ 
+ }

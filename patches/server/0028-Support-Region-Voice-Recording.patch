@@ -1,0 +1,44 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Bryan1029384756 <23323626+Bryan1029384756@users.noreply.github.com>
+Date: Fri, 30 Jun 2023 21:13:48 -0500
+Subject: [PATCH] Support Region Voice Recording
+
+
+diff --git a/src/main/java/net/minecraft/serversidereplayrecorder/recorder/RegionRecorder.java b/src/main/java/net/minecraft/serversidereplayrecorder/recorder/RegionRecorder.java
+index 7312a60b1af9c66efa60a42e81256ee700c7623f..588d1ee83912b401ee7e1ec1fb867b3bce6b11a2 100644
+--- a/src/main/java/net/minecraft/serversidereplayrecorder/recorder/RegionRecorder.java
++++ b/src/main/java/net/minecraft/serversidereplayrecorder/recorder/RegionRecorder.java
+@@ -1,7 +1,6 @@
+ package net.minecraft.serversidereplayrecorder.recorder;
+ 
+ import com.mojang.authlib.GameProfile;
+-import de.maxhenkel.voicechat.Voicechat;
+ import io.netty.buffer.Unpooled;
+ import net.minecraft.core.BlockPos;
+ import net.minecraft.core.NonNullList;
+@@ -35,6 +34,10 @@ import net.minecraft.world.level.chunk.ImposterProtoChunk;
+ import net.minecraft.world.level.chunk.LevelChunk;
+ import net.minecraft.world.level.levelgen.Heightmap;
+ import net.minecraft.world.level.storage.LevelData;
++import org.bukkit.Bukkit;
++import org.bukkit.plugin.Plugin;
++import org.bukkit.plugin.java.JavaPlugin;
++
+ import java.io.File;
+ import java.io.IOException;
+ import java.nio.file.Paths;
+@@ -219,8 +222,12 @@ public class RegionRecorder extends ReplayRecorder {
+         onPacket(new ClientboundPlayerPositionPacket(viewpoint.getX() + 0.5d,viewpoint.getY(),viewpoint.getZ() + 0.5d,0f,0f, Collections.emptySet(),0));
+         //ready to record changes
+         if(ServerSideReplayRecorderServer.config.isVoice_recording_enabled()){
+-            ServerPlayer player = new ServerPlayer(ms, ms.overworld(), FAKE_GAMEPROFILE);
+-            onPacket(Utils.createCustomPacket(new SecretPacket(player, UUID.randomUUID() , Voicechat.SERVER.getServer().getPort(), Voicechat.SERVER_CONFIG)));
++            if (Bukkit.getServer().getPluginManager().isPluginEnabled("voicechat")) {
++                de.maxhenkel.voicechat.Voicechat vc = (de.maxhenkel.voicechat.Voicechat) Bukkit.getServer().getPluginManager().getPlugin("voicechat");
++                ServerPlayer player = new ServerPlayer(ms, ms.overworld(), FAKE_GAMEPROFILE);
++                onPacket(Utils.createCustomPacket(new SecretPacket(player, UUID.randomUUID() , vc.SERVER.getServer().getPort(), vc.SERVER_CONFIG)));
++            }
++
+         }
+     }
+ 

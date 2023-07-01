@@ -9,12 +9,13 @@ plugins {
 
 val paperMavenPublicUrl = "https://repo.papermc.io/repository/maven-public/"
 val voicechatMavenPublicUrl = "https://maven.maxhenkel.de/repository/public"
-
+val modrinthMavenPublicUrl = "https://api.modrinth.com/maven"
 repositories {
     mavenCentral()
     maven(paperMavenPublicUrl) {
         content { onlyForConfigurations(configurations.paperclip.name) }
     }
+
 }
 
 dependencies {
@@ -50,6 +51,7 @@ subprojects {
         mavenCentral()
         maven(paperMavenPublicUrl)
         maven(voicechatMavenPublicUrl)
+        maven(modrinthMavenPublicUrl)
     }
 }
 
